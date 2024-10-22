@@ -32,7 +32,7 @@ from matplotlib import pyplot
 # 代码块
 
 
-class SpotCFD(TimeSeries):
+class Spot(TimeSeries):
     """现货差价合约"""
 
     def __init__(self, timeline, dayahead, realtime):
