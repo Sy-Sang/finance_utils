@@ -27,13 +27,26 @@ from data_utils.stochastic_utils.distributions.basic_distributions import Normal
 # 外部模块
 import numpy
 
+
 # 代码块
 
-# class Duck:
-#     def __init__(self, *args):
-#         self.base_list = numpy.array(base_list).astype(float)
-#
-#     def min_max(self, ):
+def excess_return(
+        submit_quantity,
+        actual_quantity,
+        price_baseline,
+        price_day_ahead,
+        price_real_time,
+        max_deviation_ratio=0.4,
+        government_price_factor=0.5
+) -> float:
+    """新能源超额获利回收"""
+    allowed_energy = actual_quantity * (1 + max_deviation_ratio)
+    energy_deviation = max(0, submit_quantity - allowed_energy)
+    price_diff = government_price_factor * price_baseline + (
+            1 - government_price_factor) * price_day_ahead - price_real_time
+    recovery_amount = energy_deviation * price_diff
+
+    return max(0, recovery_amount)
 
 
 if __name__ == "__main__":
