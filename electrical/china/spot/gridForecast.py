@@ -172,10 +172,18 @@ class DiscreteForecast:
             return self.forked_tree(bench_quantity)
 
     def sharpe(self, submitted: float, bench_quantity: float = None):
+        """夏普比率"""
         if bench_quantity is None:
             return (self.mean(submitted) - self.mean(self.default_quantity)) / self.std(submitted)
         else:
             return (self.mean(submitted) - self.mean(bench_quantity)) / self.std(submitted)
+
+
+class GeoDiscreteForecastPath:
+    """几何离散预测路径"""
+
+    def __init__(self, forecasts: list[DiscreteForecast]):
+        self.forecasts = forecasts
 
 
 if __name__ == "__main__":
