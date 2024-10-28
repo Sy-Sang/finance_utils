@@ -35,14 +35,28 @@ from sklearn.cluster import KMeans
 
 # 代码块
 
-class YieldTree:
-    """收益树"""
+class DiscreteSpotCurve:
+    """离散电力价格曲线"""
 
     def __init__(self, data):
-        self.tree = numpy.array(data).astype(float)
+        self.curve = numpy.array(data).astype(float)
 
     def __repr__(self):
-        return str(self.tree.tolist())
+        return str(self.curve.tolist())
+
+    def testback(self, submitted_quantity: list[float]):
+        """回测"""
+        r = []
+        for i, c in enumerate(self.curve):
+            temp_r = []
+            for j, p in enumerate(c):
+                actual_quantity = p[2]
+                dayahead_quantity = submitted_quantity[j]
+                realtime_quantity = actual_quantity - dayahead_quantity
+                point_yield = dayahead_quantity * p[0] + realtime_quantity * p[1]
+                temp_r.append(point_yield)
+            r.append(temp_r)
+        return numpy.array(r)
 
 
 class DiscreteForecast:
@@ -150,26 +164,19 @@ class DiscreteForecast:
                 ]
                 for i in list(itertools.product(dayahead_yield, realtime_yield))]
             trade_yield += yield_table
-        return YieldTree(trade_yield)
+        return numpy.array(trade_yield)
 
     def mean(self, submitted: float):
         """平均收益"""
-        data = self.forked_tree(submitted).tree
+        data = self.forked_tree(submitted)
         return numpy.sum(data[:, 0] * data[:, 1])
 
     def std(self, submitted: float):
         """收益标准差"""
-        data = self.forked_tree(submitted).tree
+        data = self.forked_tree(submitted)
         m = numpy.sum(data[:, 0] * data[:, 1])
         s = numpy.sum((data[:, 0] - m) ** 2 * data[:, 1])
         return s ** 0.5
-
-    def bench_mark_tree(self, bench_quantity: float = None):
-        """基准收益分布"""
-        if bench_quantity is None:
-            return self.forked_tree(self.default_quantity)
-        else:
-            return self.forked_tree(bench_quantity)
 
     def sharpe(self, submitted: float, bench_quantity: float = None):
         """夏普比率"""
@@ -179,11 +186,27 @@ class DiscreteForecast:
             return (self.mean(submitted) - self.mean(bench_quantity)) / self.std(submitted)
 
 
-class GeoDiscreteForecastPath:
-    """几何离散预测路径"""
+class DiscreteForecastPath:
+    """离散预测路径"""
 
     def __init__(self, forecasts: list[DiscreteForecast]):
         self.forecasts = forecasts
+
+    def rvf(self, n: int = 1) -> DiscreteSpotCurve:
+        """随机路径"""
+        foldlist = [[] for _ in range(n)]
+        for i, f in enumerate(self.forecasts):
+            random_forecast = f.rvf(n)
+            for j, c in enumerate(foldlist):
+                foldlist[j].append(random_forecast[j])
+
+        return DiscreteSpotCurve(foldlist)
+
+
+class GeoDiscreteForecastPath(DiscreteForecastPath):
+    def rvf(self, n: int = 1):
+        def geo(x, delta):
+            return x * (1 + delta)
 
 
 if __name__ == "__main__":
@@ -193,7 +216,9 @@ if __name__ == "__main__":
         [[190, 0.3], [200, 0.5], [210, 0.1]]
     )
 
-    print(dpf.rvf(1000).tolist())
+    # print(dpf.rvf(1000).tolist())
+    gdfp = DiscreteForecastPath([dpf, dpf, dpf, dpf])
+    print(gdfp.rvf(2))
 
     # p = YieldTree.product(
     #     [dpf.forked_tree(100), dpf.forked_tree(200), dpf.forked_tree(300)]
