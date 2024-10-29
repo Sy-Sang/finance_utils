@@ -20,22 +20,14 @@ from collections import namedtuple
 import itertools
 
 # 项目模块
-from easy_datetime.timestamp import TimeStamp
-from easy_datetime.temporal_utils import timer
-from data_utils.serial_utils.time_series import TimeSeries
-from data_utils.serial_utils.series_trans_utils import MinMax
-from data_utils.stochastic_utils.random_process import correlatedRandom
-from data_utils.solve_utils.equationNSolve import newton_method
 
 # 外部模块
 import numpy
-from matplotlib import pyplot
-from sklearn.cluster import KMeans
 
 
 # 代码块
 
-class DiscreteSpotCurve:
+class DiscreteProcessCurve:
     """离散电力价格曲线"""
 
     def __init__(self, data):
@@ -115,17 +107,13 @@ class DiscreteForecast:
                 return numpy.nan
 
         seed = numpy.random.uniform(0, 1, 3 * n)
-        if n <= 1:
-            return numpy.array(
-                [ppf(self.dayahead_cdf, seed[0]), ppf(self.realtime_cdf, seed[1]), ppf(self.quantity_cdf, seed[2])])
-        else:
-            return numpy.array([
-                numpy.array([
-                    ppf(self.dayahead_cdf, seed[0 + i * 3]),
-                    ppf(self.realtime_cdf, seed[1 + i * 3]),
-                    ppf(self.quantity_cdf, seed[2 + i * 3])
-                ]) for i in range(n)
-            ])
+        return numpy.array([
+            numpy.array([
+                ppf(self.dayahead_cdf, seed[0 + i * 3]),
+                ppf(self.realtime_cdf, seed[1 + i * 3]),
+                ppf(self.quantity_cdf, seed[2 + i * 3])
+            ]) for i in range(n)
+        ])
 
     def forked_tree(self, submitted_quantity: float):
         """多叉树"""
@@ -186,13 +174,13 @@ class DiscreteForecast:
             return (self.mean(submitted) - self.mean(bench_quantity)) / self.std(submitted)
 
 
-class DiscreteForecastPath:
+class DiscreteForecastCurve:
     """离散预测路径"""
 
     def __init__(self, forecasts: list[DiscreteForecast]):
         self.forecasts = forecasts
 
-    def rvf(self, n: int = 1) -> DiscreteSpotCurve:
+    def rvf(self, n: int = 1) -> DiscreteProcessCurve:
         """随机路径"""
         foldlist = [[] for _ in range(n)]
         for i, f in enumerate(self.forecasts):
@@ -200,13 +188,29 @@ class DiscreteForecastPath:
             for j, c in enumerate(foldlist):
                 foldlist[j].append(random_forecast[j])
 
-        return DiscreteSpotCurve(foldlist)
+        return DiscreteProcessCurve(foldlist)
 
 
-class GeoDiscreteForecastPath(DiscreteForecastPath):
+class GeoDiscreteForecastCurve(DiscreteForecastCurve):
     def rvf(self, n: int = 1):
-        def geo(x, delta):
-            return x * (1 + delta)
+        def geo(xlist, deltalist):
+            newlist = []
+            for i, x in enumerate(xlist):
+                newlist.append(x * (1 + deltalist[i]))
+            return newlist
+
+        curves = super().rvf(n).curve
+        new_curves = []
+        for i, curve in enumerate(curves):
+            new_curve = []
+            for j, point in enumerate(curve):
+                if j == 0:
+                    new_curve.append(numpy.array(point))
+                else:
+                    new_point = geo(new_curve[- 1], point)
+                    new_curve.append(numpy.array(new_point))
+            new_curves.append(new_curve)
+        return DiscreteProcessCurve(new_curves)
 
 
 if __name__ == "__main__":
@@ -217,8 +221,9 @@ if __name__ == "__main__":
     )
 
     # print(dpf.rvf(1000).tolist())
-    gdfp = DiscreteForecastPath([dpf, dpf, dpf, dpf])
-    print(gdfp.rvf(2))
+    # gdfp = DiscreteForecastCurve([dpf, dpf, dpf, dpf])
+    gdfp = GeoDiscreteForecastCurve([dpf, dpf, dpf, dpf])
+    print(gdfp.rvf(1))
 
     # p = YieldTree.product(
     #     [dpf.forked_tree(100), dpf.forked_tree(200), dpf.forked_tree(300)]
