@@ -45,12 +45,12 @@ class AnarchismRecycle(Recycle):
 
 
 class SampleRecycle(Recycle):
-    def __call__(self, *args, **kwargs):
+    def __call__(self, punishment_rate: float = 0.5, *args, **kwargs):
         punishment = 0
         spot_array = numpy.array(self.spot_list).astype(float)
         power_deviation = abs(numpy.sum(self.submit_list) / numpy.sum(spot_array[:, 2]) - 1)
         if power_deviation >= 0.05:
-            punishment = max(0, self.benefits * 0.5)
+            punishment = max(0, self.benefits * punishment_rate)
         else:
             pass
         return punishment
@@ -83,6 +83,7 @@ class TestBack:
         #     recycle = f
         testback_yield_list = []
         total_yield_list = []
+        punishment_list = []
         for i, sample_list in enumerate(self.samples):
             trade_yield_list = []
             for j, sample_point in enumerate(sample_list):
@@ -91,7 +92,6 @@ class TestBack:
                 )
                 trade_yield_list.append(trade_yield)
             total_yield = numpy.sum(trade_yield_list)
-            testback_yield_list.append(trade_yield_list)
 
             if f is None:
                 recycle = SampleRecycle(sample_list, submitted_list, total_yield)
@@ -101,6 +101,8 @@ class TestBack:
             total_yield_list.append(
                 total_yield - recycle(*args, **kwargs)
             )
+            testback_yield_list.append(trade_yield_list)
+            punishment_list.append(recycle)
 
         return TestBackCurve(
             numpy.array(testback_yield_list).astype(float), numpy.array(total_yield_list).astype(float)

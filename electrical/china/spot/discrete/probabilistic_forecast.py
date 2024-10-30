@@ -63,6 +63,7 @@ class ProbabilisticDiscreteCurve:
 
     def __init__(self, data: list[ABCDistribution], min: float = 0, max: float = None):
         self.original = [ProbabilisticPoint(i) for i in data]
+        self.value_list = [i.value for i in self.original]
         self.len = len(self.original)
         self.min = min
         self.max = max
@@ -173,25 +174,6 @@ class DiscreteSpot:
     def random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1,
                       geo: bool = False) -> numpy.ndarray:
         """随机样本"""
-        # if geo is False:
-        #     data = self.cdf(first, end, n)
-        # else:
-        #     data = self.geo_cdf(first, end, n)
-        # dayahead_cdf = data[0]
-        # realtime_cdf = data[1]
-        # quantity_cdf = data[2]
-        # sample_list = []
-        # for i in range(eps):
-        #     point_sample = []
-        #     for l in range(len(dayahead_cdf)):
-        #         seed = numpy.random.uniform(0, 1, 3)
-        #         point_sample.append([
-        #             get_sample(dayahead_cdf[l], seed[0]),
-        #             get_sample(realtime_cdf[l], seed[1]),
-        #             get_sample(quantity_cdf[l], seed[2])
-        #         ])
-        #     sample_list.append(point_sample)
-        # return numpy.array(sample_list)
         sample_list = []
         dayahead_sample = self.dayahead.random_sample(first, end, n, eps, geo)
         realtime_sample = self.realtime.random_sample(first, end, n, eps, geo)
@@ -207,19 +189,6 @@ class DiscreteSpot:
 
     def geo_random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1) -> numpy.ndarray:
         """几何随机样本"""
-        # data = self.random_sample(first, end, n, eps, True)
-        # sample_list = []
-        # for i, sample_row in enumerate(data):
-        #     point_sample_list = []
-        #     for j, sample_point in enumerate(sample_row):
-        #         if j == 0:
-        #             point_sample_list.append(sample_point)
-        #         else:
-        #             point_sample_list.append([
-        #                 point_sample_list[-1][k] * (1 + sample_point[k]) for k in range(3)
-        #             ])
-        #     sample_list.append(point_sample_list)
-        # return numpy.array(sample_list)
         sample_list = []
         dayahead_sample = self.dayahead.geo_random_sample(first, end, n, eps)
         realtime_sample = self.realtime.geo_random_sample(first, end, n, eps)
