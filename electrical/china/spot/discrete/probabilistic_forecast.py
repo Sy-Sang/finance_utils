@@ -25,8 +25,10 @@ from data_utils.stochastic_utils.distributions.basic_distributions import Normal
 # 外部模块
 import numpy
 
-
 # 代码块
+
+Epsilon = numpy.finfo(float).eps
+
 
 def get_sample(cdf_list, x):
     if 0 < x < 1:
@@ -57,6 +59,17 @@ class ProbabilisticPoint:
         curve = self.dist.cdf(first=first, end=end, num=n)
         return numpy.column_stack((curve.x, curve.y))
 
+    def random_cdf(self, n: int = 10):
+        """生成随机变量的cdf曲线"""
+        r = self.dist.rvf(n)
+        curve = numpy.array([
+            [
+                x, self.dist.cdf(x)
+            ] for x in r
+        ]).astype(float)
+        sort_index = numpy.argsort(curve[:, 0])
+        return curve[sort_index]
+
 
 class ProbabilisticDiscreteCurve:
     """基于概率分布的离散曲线"""
@@ -79,19 +92,26 @@ class ProbabilisticDiscreteCurve:
         else:
             return min(max(self.min, x), self.max)
 
-    def cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10) -> numpy.ndarray:
+    def cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10, use_random=False) -> numpy.ndarray:
         """离散的概率密度曲线"""
         cdf_curve = []
         for i, d in enumerate(self.original):
-            cdf = d.cdf(first=first, end=end, n=n)
+            if use_random is False:
+                cdf = d.cdf(first=first, end=end, n=n)
+            else:
+                cdf = d.random_cdf(n=n)
             cdf_curve.append(cdf)
-        return numpy.array(cdf_curve)
+        return numpy.array(cdf_curve).astype(float)
 
-    def geo_cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10) -> numpy.ndarray:
+    def geo_cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10, use_random=False) -> numpy.ndarray:
         """离散的概率密度曲线(几何)"""
         cdf_curve = []
         for i, d in enumerate(self.original):
-            this_cdf = d.cdf(first=first, end=end, n=n)
+            if use_random is False:
+                this_cdf = d.cdf(first=first, end=end, n=n)
+            else:
+                this_cdf = d.random_cdf(n=n)
+
             if i == 0:
                 cdf_curve.append(this_cdf)
             else:
@@ -99,15 +119,15 @@ class ProbabilisticDiscreteCurve:
                 cdf_curve.append(
                     numpy.column_stack((delta, this_cdf[:, 1]))
                 )
-        return numpy.array(cdf_curve)
+        return numpy.array(cdf_curve).astype(float)
 
     def random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1,
-                      geo: bool = False) -> numpy.ndarray:
+                      geo: bool = False, use_random=False) -> numpy.ndarray:
         """生成随机样本"""
         if geo is False:
-            cdf_list = self.cdf(first, end, n)
+            cdf_list = self.cdf(first, end, n, use_random=use_random)
         else:
-            cdf_list = self.geo_cdf(first, end, n)
+            cdf_list = self.geo_cdf(first, end, n, use_random=use_random)
         sample_list = []
         for _ in range(eps):
             point_sample = []
@@ -119,10 +139,11 @@ class ProbabilisticDiscreteCurve:
                     s = get_sample(cdf_list[l], seed)
                 point_sample.append(s)
             sample_list.append(point_sample)
-        return numpy.array(sample_list)
+        return numpy.array(sample_list).astype(float)
 
-    def geo_random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1) -> numpy.ndarray:
-        samples = self.random_sample(first, end, n, eps, True)
+    def geo_random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1,
+                          use_random=False) -> numpy.ndarray:
+        samples = self.random_sample(first, end, n, eps, True, use_random=use_random)
         sample_list = []
         for i, sample_row in enumerate(samples):
             point_sample_list = []
@@ -135,7 +156,7 @@ class ProbabilisticDiscreteCurve:
                     )
                 point_sample_list.append(s)
             sample_list.append(point_sample_list)
-        return numpy.array(sample_list)
+        return numpy.array(sample_list).astype(float)
 
 
 class DiscreteSpot:
@@ -151,33 +172,33 @@ class DiscreteSpot:
         self.realtime = copy.deepcopy(realtime)
         self.quantity = copy.deepcopy(quantity)
 
-    def cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10) -> numpy.ndarray:
-        dayahead_cdf = self.dayahead.cdf(first, end, n)
-        realtime_cdf = self.realtime.cdf(first, end, n)
-        quantity_cdf = self.quantity.cdf(first, end, n)
+    def cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10, use_random=False) -> numpy.ndarray:
+        dayahead_cdf = self.dayahead.cdf(first, end, n, use_random=use_random)
+        realtime_cdf = self.realtime.cdf(first, end, n, use_random=use_random)
+        quantity_cdf = self.quantity.cdf(first, end, n, use_random=use_random)
         return numpy.array([
             dayahead_cdf,
             realtime_cdf,
             quantity_cdf
-        ])
+        ]).astype(float)
 
-    def geo_cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10) -> numpy.ndarray:
-        dayahead_cdf = self.dayahead.geo_cdf(first, end, n)
-        realtime_cdf = self.realtime.geo_cdf(first, end, n)
-        quantity_cdf = self.quantity.geo_cdf(first, end, n)
+    def geo_cdf(self, first: float = 0.01, end: float = 0.99, n: int = 10, use_random=False) -> numpy.ndarray:
+        dayahead_cdf = self.dayahead.geo_cdf(first, end, n, use_random=use_random)
+        realtime_cdf = self.realtime.geo_cdf(first, end, n, use_random=use_random)
+        quantity_cdf = self.quantity.geo_cdf(first, end, n, use_random=use_random)
         return numpy.array([
             dayahead_cdf,
             realtime_cdf,
             quantity_cdf
-        ])
+        ]).astype(float)
 
-    def random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1,
-                      geo: bool = False) -> numpy.ndarray:
+    def random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, eps: int = 1,
+                      geo: bool = False, use_random=False) -> numpy.ndarray:
         """随机样本"""
         sample_list = []
-        dayahead_sample = self.dayahead.random_sample(first, end, n, eps, geo)
-        realtime_sample = self.realtime.random_sample(first, end, n, eps, geo)
-        quantity_sampe = self.quantity.random_sample(first, end, n, eps, geo)
+        dayahead_sample = self.dayahead.random_sample(first, end, n, eps, geo, use_random=use_random)
+        realtime_sample = self.realtime.random_sample(first, end, n, eps, geo, use_random=use_random)
+        quantity_sampe = self.quantity.random_sample(first, end, n, eps, geo, use_random=use_random)
         for i in range(eps):
             row = numpy.column_stack((
                 dayahead_sample[i],
@@ -185,14 +206,15 @@ class DiscreteSpot:
                 quantity_sampe[i]
             ))
             sample_list.append(row)
-        return numpy.array(sample_list)
+        return numpy.array(sample_list).astype(float)
 
-    def geo_random_sample(self, first: float = 0.01, end: float = 0.99, n: int = 10, eps: int = 1) -> numpy.ndarray:
+    def geo_random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, eps: int = 1,
+                          use_random=False) -> numpy.ndarray:
         """几何随机样本"""
         sample_list = []
-        dayahead_sample = self.dayahead.geo_random_sample(first, end, n, eps)
-        realtime_sample = self.realtime.geo_random_sample(first, end, n, eps)
-        quantity_sampe = self.quantity.geo_random_sample(first, end, n, eps)
+        dayahead_sample = self.dayahead.geo_random_sample(first, end, n, eps, use_random=use_random)
+        realtime_sample = self.realtime.geo_random_sample(first, end, n, eps, use_random=use_random)
+        quantity_sampe = self.quantity.geo_random_sample(first, end, n, eps, use_random=use_random)
         for i in range(eps):
             row = numpy.column_stack((
                 dayahead_sample[i],
@@ -200,7 +222,7 @@ class DiscreteSpot:
                 quantity_sampe[i]
             ))
             sample_list.append(row)
-        return numpy.array(sample_list)
+        return numpy.array(sample_list).astype(float)
 
 
 if __name__ == "__main__":
