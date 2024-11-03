@@ -147,7 +147,6 @@ class TestBack:
             testback_list.append(testback)
         return testback_list
 
-
     def differential_evolution__search(
             self, submitted_list: list[float], recycle: Type[Recycle] = None,
             delta_min: float = -10, delta_max: float = 10,
@@ -155,7 +154,9 @@ class TestBack:
             *args, **kwargs
     ):
         """差分进化"""
+
         def target(xlist):
+            """目标函数"""
             xlist = EasyFloat.put_in_range(submitted_min, submitted_max, *xlist)
             trade_yield = self.testback_yield(
                 submitted_list=xlist,
@@ -173,7 +174,6 @@ class TestBack:
 
         result = differential_evolution(target, bounds)
         return result.x, -result.fun
-
 
 
 if __name__ == "__main__":

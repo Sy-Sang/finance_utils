@@ -21,6 +21,7 @@ from collections import namedtuple
 # 项目模块
 from data_utils.stochastic_utils.distributions.baseclass import ABCDistribution
 from data_utils.stochastic_utils.distributions.basic_distributions import NormalDistribution
+from data_utils.stochastic_utils.distributions.nonParametricDistribution import HistogramDist
 from data_utils.solve_utils.equationNSolve import gradient_descent
 from easy_utils.number_utils.number_utils import EasyFloat
 from easy_utils.obj_utils.enumerable_utils import flatten
@@ -81,23 +82,23 @@ class ProbabilisticPoint:
 class ProbabilisticDiscreteCurve:
     """基于概率分布的离散曲线"""
 
-    def __init__(self, data: list[ABCDistribution], min: float = 0, max: float = None):
+    def __init__(self, data: list[ABCDistribution], domain_min: float = 0, domain_max: float = None):
         self.original = [ProbabilisticPoint(i) for i in data]
         self.value_list = [i.value for i in self.original]
         self.len = len(self.original)
-        self.min = min
-        self.max = max
+        self.domain_min = domain_min
+        self.domain_max = domain_max
 
     def put_in_range(self, x: float):
         """将随机变量置于曲线可用范围内"""
-        if self.min and self.max is None:
+        if self.domain_min and self.domain_max is None:
             return x
-        elif self.min is None:
-            return min(self.max, x)
-        elif self.max is None:
-            return max(self.min, x)
+        elif self.domain_min is None:
+            return min(self.domain_max, x)
+        elif self.domain_max is None:
+            return max(self.domain_min, x)
         else:
-            return min(max(self.min, x), self.max)
+            return min(max(self.domain_min, x), self.domain_max)
 
     def cdf(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, use_random=False) -> numpy.ndarray:
         """离散的概率密度曲线"""
@@ -150,19 +151,41 @@ class ProbabilisticDiscreteCurve:
 
     def geo_random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, epoch: int = 1,
                           use_random=False) -> numpy.ndarray:
+        """几何随机样本"""
         samples = self.random_sample(first, end, n, epoch, True, use_random=use_random)
         sample_list = []
         for i, sample_row in enumerate(samples):
             point_sample_list = []
             for j, sample_point in enumerate(sample_row):
                 if j == 0:
-                    s = self.put_in_range(sample_point)
+                    s = sample_point
                 else:
-                    s = self.put_in_range(
-                        point_sample_list[-1] * (1 + sample_point)
-                    )
+                    s = point_sample_list[-1] * (1 + sample_point)
                 point_sample_list.append(s)
-            sample_list.append(point_sample_list)
+            sample_list.append([self.put_in_range(p) for p in point_sample_list])
+        return numpy.array(sample_list).astype(float)
+
+    def diff_random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10,
+                           epoch: int = 1) -> numpy.ndarray:
+        """差分随机样本"""
+        sample_list = []
+        diff_dist_list = [None]
+        for i in range(1, self.len):
+            diff = (self.original[i].dist.cdf(first=first, end=end, num=n).x
+                    - self.original[i - 1].dist.cdf(first=first, end=end, num=n).x)
+            diff_dist = HistogramDist(diff)
+            diff_dist_list.append(diff_dist)
+
+        for _ in range(epoch):
+            epoch_sample_list = []
+            for i in range(self.len):
+                p = numpy.random.uniform(Epsilon, 1 - Epsilon)
+                if i == 0:
+                    epoch_sample_list.append(self.original[i].dist.ppf(p))
+                else:
+                    d = diff_dist_list[i].ppf(p)
+                    epoch_sample_list.append(d + epoch_sample_list[-1])
+            sample_list.append([self.put_in_range(s) for s in epoch_sample_list])
         return numpy.array(sample_list).astype(float)
 
 
@@ -205,12 +228,12 @@ class DiscreteSpot:
         sample_list = []
         dayahead_sample = self.dayahead.random_sample(first, end, n, epoch, geo, use_random=use_random)
         realtime_sample = self.realtime.random_sample(first, end, n, epoch, geo, use_random=use_random)
-        quantity_sampe = self.quantity.random_sample(first, end, n, epoch, geo, use_random=use_random)
+        quantity_sample = self.quantity.random_sample(first, end, n, epoch, geo, use_random=use_random)
         for i in range(epoch):
             row = numpy.column_stack((
                 dayahead_sample[i],
                 realtime_sample[i],
-                quantity_sampe[i]
+                quantity_sample[i]
             ))
             sample_list.append(row)
         return numpy.array(sample_list).astype(float)
@@ -221,12 +244,28 @@ class DiscreteSpot:
         sample_list = []
         dayahead_sample = self.dayahead.geo_random_sample(first, end, n, epoch, use_random=use_random)
         realtime_sample = self.realtime.geo_random_sample(first, end, n, epoch, use_random=use_random)
-        quantity_sampe = self.quantity.geo_random_sample(first, end, n, epoch, use_random=use_random)
+        quantity_sample = self.quantity.geo_random_sample(first, end, n, epoch, use_random=use_random)
         for i in range(epoch):
             row = numpy.column_stack((
                 dayahead_sample[i],
                 realtime_sample[i],
-                quantity_sampe[i]
+                quantity_sample[i]
+            ))
+            sample_list.append(row)
+        return numpy.array(sample_list).astype(float)
+
+    def diff_random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, epoch: int = 1,
+                           use_random=False) -> numpy.ndarray:
+        """差分随机样本"""
+        sample_list = []
+        dayahead_sample = self.dayahead.diff_random_sample(first, end, n, epoch)
+        realtime_sample = self.realtime.diff_random_sample(first, end, n, epoch)
+        quantity_sample = self.quantity.diff_random_sample(first, end, n, epoch)
+        for i in range(epoch):
+            row = numpy.column_stack((
+                dayahead_sample[i],
+                realtime_sample[i],
+                quantity_sample[i]
             ))
             sample_list.append(row)
         return numpy.array(sample_list).astype(float)
@@ -319,27 +358,29 @@ if __name__ == "__main__":
         NormalDistribution(7, 2),
     ])
 
-    spot = DiscreteSpot(dayahead, realtime, quantity)
-    print(spot.differential_evolution__search(
-        spot.quantity.value_list,
-        delta_min=-20, delta_max=20,
-        submitted_min=0, submitted_max=20,
-        recycle=SampleRecycle,
-        trigger_rate=0.05,
-        punishment_rate=0.5,
-    ))
+    print(quantity.diff_random_sample(epoch=10))
 
-    print(
-        province_new_energy_with_recycle(
-            spot.dayahead.value_list,
-            spot.realtime.value_list,
-            spot.quantity.value_list,
-            spot.quantity.value_list,
-            recycle=SampleRecycle,
-            trigger_rate=0.05,
-            punishment_rate=0.5,
-        )
-    )
+    # spot = DiscreteSpot(dayahead, realtime, quantity)
+    # print(spot.differential_evolution__search(
+    #     spot.quantity.value_list,
+    #     delta_min=-20, delta_max=20,
+    #     submitted_min=0, submitted_max=20,
+    #     recycle=SampleRecycle,
+    #     trigger_rate=0.05,
+    #     punishment_rate=0.5,
+    # ))
+    #
+    # print(
+    #     province_new_energy_with_recycle(
+    #         spot.dayahead.value_list,
+    #         spot.realtime.value_list,
+    #         spot.quantity.value_list,
+    #         spot.quantity.value_list,
+    #         recycle=SampleRecycle,
+    #         trigger_rate=0.05,
+    #         punishment_rate=0.5,
+    #     )
+    # )
 
     # print(spot.random_sample(n=100, epoch=100).tolist())
     # seeds = numpy.random.uniform(0, 1, 100)

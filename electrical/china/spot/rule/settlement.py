@@ -23,8 +23,6 @@ from finance_utils.electrical.china.spot.rule.recycle import Recycle, AnarchismR
 
 # 外部模块
 import numpy
-import torch
-
 
 # 代码块
 
