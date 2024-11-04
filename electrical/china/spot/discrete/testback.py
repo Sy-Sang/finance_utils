@@ -22,10 +22,10 @@ from itertools import product
 
 # 项目模块
 from easy_utils.number_utils.number_utils import EasyFloat
-from data_utils.solve_utils.equationNSolve import gradient_descent
+from data_utils.stochastic_utils.distributions.baseclass import ABCDistribution
 
 from finance_utils.electrical.china.spot.rule.recycle import Recycle, SampleRecycle
-from finance_utils.electrical.china.spot.rule.settlement import province_new_energy
+from finance_utils.electrical.china.spot.rule.settlement import province_new_energy, province_new_energy_with_recycle
 
 # 外部模块
 import numpy
@@ -62,6 +62,7 @@ class TestBack:
 
     def __init__(self, samples):
         self.samples = numpy.array(samples).astype(float)
+        self.size = (len(self.samples), len(self.samples[0]))
 
     def testback_yield(self, submitted_list: list[float], recycle: Recycle = None, *args, **kwargs) -> TestBackCurve:
         """回测收益曲线"""

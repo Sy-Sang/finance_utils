@@ -166,7 +166,7 @@ class ProbabilisticDiscreteCurve:
         return numpy.array(sample_list).astype(float)
 
     def diff_random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10,
-                           epoch: int = 1) -> numpy.ndarray:
+                           p: float = 0.5, epoch: int = 1) -> numpy.ndarray:
         """差分随机样本"""
         sample_list = []
         diff_dist_list = [None]
@@ -179,14 +179,49 @@ class ProbabilisticDiscreteCurve:
         for _ in range(epoch):
             epoch_sample_list = []
             for i in range(self.len):
-                p = numpy.random.uniform(Epsilon, 1 - Epsilon)
+                rp = numpy.random.uniform(Epsilon, 1 - Epsilon, 3)
                 if i == 0:
-                    epoch_sample_list.append(self.original[i].dist.ppf(p))
+                    rv = self.original[i].dist.ppf(rp[0])
                 else:
-                    d = diff_dist_list[i].ppf(p)
-                    epoch_sample_list.append(d + epoch_sample_list[-1])
+                    d = diff_dist_list[i].ppf(rp[0])
+                    rv_s = [self.original[i].dist.ppf(rp[0]), 1 - p]
+                    rv_d = [d + epoch_sample_list[-1], p]
+                    rv_array = numpy.array([rv_s, rv_d])
+                    rv_cdf = rv_array[numpy.argsort(rv_array[:, 0])]
+                    rv = get_sample(rv_cdf, rp[2])
+                epoch_sample_list.append(rv)
             sample_list.append([self.put_in_range(s) for s in epoch_sample_list])
         return numpy.array(sample_list).astype(float)
+
+    # def add_noise(self, data, noise: list[ABCDistribution]) -> numpy.ndarray:
+    #     """添加噪音"""
+    #     sample_list = []
+    #     for i in range(len(data)):
+    #         row = data[i]
+    #         nrow = []
+    #         for i, r in enumerate(row):
+    #             nrow.append(r + noise[i].rvf())
+    #         sample_list.append([self.put_in_range(s) for s in nrow])
+    #     return numpy.array(sample_list).astype(float)
+
+
+class SpotNoise:
+    def __init__(
+            self,
+            dayahead: list[ABCDistribution],
+            realtime: list[ABCDistribution],
+            quantity: list[ABCDistribution]
+    ):
+        self.dayahead = dayahead
+        self.realtime = realtime
+        self.quantity = quantity
+
+    def __call__(self, *args, **kwargs):
+        return [
+            [i.rvf() for i in self.dayahead],
+            [i.rvf() for i in self.realtime],
+            [i.rvf() for i in self.quantity]
+        ]
 
 
 class DiscreteSpot:
@@ -255,12 +290,12 @@ class DiscreteSpot:
         return numpy.array(sample_list).astype(float)
 
     def diff_random_sample(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, epoch: int = 1,
-                           use_random=False) -> numpy.ndarray:
+                           p=0.5, use_random=False) -> numpy.ndarray:
         """差分随机样本"""
         sample_list = []
-        dayahead_sample = self.dayahead.diff_random_sample(first, end, n, epoch)
-        realtime_sample = self.realtime.diff_random_sample(first, end, n, epoch)
-        quantity_sample = self.quantity.diff_random_sample(first, end, n, epoch)
+        dayahead_sample = self.dayahead.diff_random_sample(first, end, n, p, epoch)
+        realtime_sample = self.realtime.diff_random_sample(first, end, n, p, epoch)
+        quantity_sample = self.quantity.diff_random_sample(first, end, n, p, epoch)
         for i in range(epoch):
             row = numpy.column_stack((
                 dayahead_sample[i],
@@ -269,6 +304,38 @@ class DiscreteSpot:
             ))
             sample_list.append(row)
         return numpy.array(sample_list).astype(float)
+
+    def add_noise(self, data, noise: SpotNoise):
+        """添加噪音"""
+        sample_list = []
+        for i, d in enumerate(data):
+            n = noise()
+            noised_dayahead = [self.dayahead.put_in_range(x) for x in d[:, 0] + n[0]]
+            noised_realtime = [self.realtime.put_in_range(x) for x in d[:, 1] + n[1]]
+            noised_quantity = [self.quantity.put_in_range(x) for x in d[:, 2] + n[2]]
+
+            row = numpy.column_stack((
+                noised_dayahead,
+                noised_realtime,
+                noised_quantity
+            ))
+            sample_list.append(row)
+        return numpy.array(sample_list).astype(float)
+
+    def value_list_yield(self, xlist, recycle: Type[Recycle] = None, submitted_min: float = 0,
+                         submitted_max: float = None,
+                         *args, **kwargs):
+        """不考虑随机性的收益"""
+        xlist = EasyFloat.put_in_range(submitted_min, submitted_max, *xlist)
+        trade_yield = province_new_energy_with_recycle(
+            self.dayahead.value_list,
+            self.realtime.value_list,
+            self.quantity.value_list,
+            xlist,
+            recycle=recycle,
+            *args, **kwargs
+        )
+        return trade_yield
 
     def differential_evolution__search(
             self, submitted_list: list[float], recycle: Type[Recycle] = None,
@@ -358,17 +425,15 @@ if __name__ == "__main__":
         NormalDistribution(7, 2),
     ])
 
-    print(quantity.diff_random_sample(epoch=10))
+    # s = quantity.diff_random_sample(epoch=10)
+    # print(quantity.add_noise(s, [NormalDistribution(0, 10)] * 4))
 
-    # spot = DiscreteSpot(dayahead, realtime, quantity)
-    # print(spot.differential_evolution__search(
-    #     spot.quantity.value_list,
-    #     delta_min=-20, delta_max=20,
-    #     submitted_min=0, submitted_max=20,
-    #     recycle=SampleRecycle,
-    #     trigger_rate=0.05,
-    #     punishment_rate=0.5,
-    # ))
+    spot = DiscreteSpot(dayahead, realtime, quantity)
+    print(spot.diff_random_sample(
+        n=10,
+        epoch=10,
+        use_random=True
+    )[0])
     #
     # print(
     #     province_new_energy_with_recycle(
