@@ -89,6 +89,9 @@ class ProbabilisticDiscreteCurve:
         self.domain_min = domain_min
         self.domain_max = domain_max
 
+    def __repr__(self):
+        return str(f"{self.original}")
+
     def put_in_range(self, x: float):
         """将随机变量置于曲线可用范围内"""
         if self.domain_min and self.domain_max is None:
@@ -193,19 +196,10 @@ class ProbabilisticDiscreteCurve:
             sample_list.append([self.put_in_range(s) for s in epoch_sample_list])
         return numpy.array(sample_list).astype(float)
 
-    # def add_noise(self, data, noise: list[ABCDistribution]) -> numpy.ndarray:
-    #     """添加噪音"""
-    #     sample_list = []
-    #     for i in range(len(data)):
-    #         row = data[i]
-    #         nrow = []
-    #         for i, r in enumerate(row):
-    #             nrow.append(r + noise[i].rvf())
-    #         sample_list.append([self.put_in_range(s) for s in nrow])
-    #     return numpy.array(sample_list).astype(float)
-
 
 class SpotNoise:
+    """现货市场噪音"""
+
     def __init__(
             self,
             dayahead: list[ABCDistribution],
@@ -236,6 +230,9 @@ class DiscreteSpot:
         self.dayahead = copy.deepcopy(dayahead)
         self.realtime = copy.deepcopy(realtime)
         self.quantity = copy.deepcopy(quantity)
+
+    def __repr__(self):
+        return str(f"{self.dayahead},{self.realtime},{self.quantity}")
 
     def cdf(self, first: float = Epsilon, end: float = 1 - Epsilon, n: int = 10, use_random=False) -> numpy.ndarray:
         dayahead_cdf = self.dayahead.cdf(first, end, n, use_random=use_random)
@@ -305,7 +302,7 @@ class DiscreteSpot:
             sample_list.append(row)
         return numpy.array(sample_list).astype(float)
 
-    def add_noise(self, data, noise: SpotNoise):
+    def noised_random_sample(self, data, noise: SpotNoise) -> numpy.ndarray:
         """添加噪音"""
         sample_list = []
         for i, d in enumerate(data):
@@ -321,6 +318,40 @@ class DiscreteSpot:
             ))
             sample_list.append(row)
         return numpy.array(sample_list).astype(float)
+
+    def noised_spot(self, data, noise: SpotNoise) -> Self:
+        """添加噪音后的现货对象"""
+        noised_sample = self.noised_random_sample(data, noise)
+        dayahead_list = []
+        realtime_list = []
+        quantity_list = []
+        dayahead_dist_list = []
+        realtime_dist_list = []
+        quantity_dist_list = []
+        for i, s in enumerate(noised_sample):
+            row_dayahead = s[:, 0]
+            row_realtime = s[:, 1]
+            row_quantity = s[:, 2]
+            for j in range(len(row_dayahead)):
+                if i == 0:
+                    dayahead_list.append([row_dayahead[j]])
+                    realtime_list.append([row_realtime[j]])
+                    quantity_list.append([row_quantity[j]])
+                else:
+                    dayahead_list[j].append(row_dayahead[j])
+                    realtime_list[j].append(row_realtime[j])
+                    quantity_list[j].append(row_quantity[j])
+
+        for i in range(len(dayahead_list)):
+            dayahead_dist_list.append(HistogramDist(dayahead_list[i]))
+            realtime_dist_list.append(HistogramDist(realtime_list[i]))
+            quantity_dist_list.append(HistogramDist(quantity_list[i]))
+
+        return type(self)(
+            ProbabilisticDiscreteCurve(dayahead_dist_list, self.dayahead.domain_min, self.dayahead.domain_max),
+            ProbabilisticDiscreteCurve(realtime_dist_list, self.realtime.domain_min, self.realtime.domain_max),
+            ProbabilisticDiscreteCurve(quantity_dist_list, self.quantity.domain_min, self.quantity.domain_max)
+        )
 
     def value_list_yield(self, xlist, recycle: Type[Recycle] = None, submitted_min: float = 0,
                          submitted_max: float = None,
@@ -429,11 +460,16 @@ if __name__ == "__main__":
     # print(quantity.add_noise(s, [NormalDistribution(0, 10)] * 4))
 
     spot = DiscreteSpot(dayahead, realtime, quantity)
-    print(spot.diff_random_sample(
-        n=10,
-        epoch=10,
-        use_random=True
-    )[0])
+    samples = spot.diff_random_sample(n=100, epoch=100)
+    noise = SpotNoise(
+        [NormalDistribution(0, 1)] * 4,
+        [NormalDistribution(0, 1)] * 4,
+        [NormalDistribution(0, 1)] * 4
+    )
+
+    # print(spot.noised_random_sample(samples, noise))
+
+    print(spot.noised_spot(samples, noise))
     #
     # print(
     #     province_new_energy_with_recycle(
