@@ -398,41 +398,6 @@ class DiscreteSpot:
         result = differential_evolution(target, bounds)
         return result.x, -result.fun
 
-    def gradient_descent_search(
-            self,
-            submitted_list: list[float], target_yield: float, recycle: Type[Recycle] = None,
-            submitted_min: float = 0, submitted_max: float = None,
-            eps: float = 0.1, lr: float = 0.1, epoch: int = 200,
-            *args, **kwargs
-    ):
-        """梯度下降搜索最优submitted quantity"""
-
-        def target(xlist):
-            xlist = EasyFloat.put_in_range(submitted_min, submitted_max, *xlist)
-            return province_new_energy_with_recycle(
-                self.dayahead.value_list,
-                self.realtime.value_list,
-                self.quantity.value_list,
-                xlist,
-                recycle=recycle,
-                *args, **kwargs
-            )
-
-        gd = gradient_descent(
-            f=target,
-            x=submitted_list,
-            y=[target_yield],
-            eps=eps,
-            lr=lr,
-            epoch=epoch,
-            print_loss=True
-        )
-
-        return EasyFloat.put_in_range(
-            submitted_min, submitted_max,
-            *gd[0]
-        ), gd[1]
-
 
 if __name__ == "__main__":
     dayahead = ProbabilisticDiscreteCurve([

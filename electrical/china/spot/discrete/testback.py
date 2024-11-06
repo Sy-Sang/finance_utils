@@ -96,21 +96,6 @@ class TestBack:
             numpy.array(punishment_list).astype(float)
         )
 
-    def grid_search(self, submitted_list: list[float], recycle: Recycle = None, delta_min: float = -1,
-                    delta_max: float = 1, interval=0.2, *args, **kwargs) -> tuple:
-        """网格搜索"""
-        grid_delta = numpy.array(EasyFloat.frange(delta_min, delta_max, interval, True)).astype(float)
-        grid_list = [grid_delta + submitted_list[i] for i in range(len(submitted_list))]
-        grid = product(*grid_list)
-        search_yield = []
-        search_list = []
-        for g in grid:
-            testback = self.testback_yield(g, recycle, *args, **kwargs)
-            search_yield.append(testback.mean())
-            search_list.append(g)
-        sort_index = numpy.argsort(search_yield)
-        return numpy.array(search_list[sort_index[-1]]), search_yield[sort_index[-1]]
-
     def random_grid_search(
             self, submitted_list: list[float], recycle: Recycle = None, delta_min: float = -10,
             delta_max: float = 10, epoch: int = 100, submitted_min: float = 0, submitted_max: float = None,
