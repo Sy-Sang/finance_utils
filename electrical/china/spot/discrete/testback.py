@@ -96,6 +96,22 @@ class TestBack:
             numpy.array(punishment_list).astype(float)
         )
 
+    def __call__(self, submitted_list: list[float], recycle: Recycle = None, *args, **kwargs) -> numpy.ndarray:
+        testback_yield_list = []
+        for i, sample_list in enumerate(self.samples):
+            sample_array = numpy.array(sample_list).astype(float)
+            testback_yield_list.append(
+                province_new_energy_with_recycle(
+                    sample_array[:, 0],
+                    sample_array[:, 1],
+                    sample_array[:, 2],
+                    submitted_list,
+                    recycle,
+                    *args, **kwargs
+                )
+            )
+        return numpy.array(testback_yield_list).astype(float)
+
     def random_grid_search(
             self, submitted_list: list[float], recycle: Recycle = None, delta_min: float = -10,
             delta_max: float = 10, epoch: int = 100, submitted_min: float = 0, submitted_max: float = None,
@@ -135,7 +151,7 @@ class TestBack:
 
     def differential_evolution__search(
             self, submitted_list: list[float], recycle: Type[Recycle] = None,
-            delta_min: float = -10, delta_max: float = 10,
+            delta_min: float = -1, delta_max: float = 1,
             submitted_min: float = 0, submitted_max: float = None,
             *args, **kwargs
     ):

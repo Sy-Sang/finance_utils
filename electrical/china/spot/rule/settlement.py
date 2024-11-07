@@ -27,7 +27,7 @@ import numpy
 
 # 代码块
 
-def province_new_energy(dayahead, realtime, realtime_quantity, submitted_quantity):
+def province_new_energy(dayahead: float, realtime: float, realtime_quantity: float, submitted_quantity: float):
     """交易结算函数"""
     return float(
         dayahead * submitted_quantity + (realtime_quantity - submitted_quantity) * realtime
@@ -35,7 +35,8 @@ def province_new_energy(dayahead, realtime, realtime_quantity, submitted_quantit
 
 
 def province_new_energy_with_recycle(
-        dayahead, realtime, realtime_quantity, submitted_quantity, recycle: Type[Recycle] = None, *args, **kwargs
+        dayahead: list, realtime: list, realtime_quantity: list, submitted_quantity: list,
+        recycle: Type[Recycle] = None, *args, **kwargs
 ):
     """包含省新能源回收的结算"""
     point_yield = []
