@@ -370,7 +370,6 @@ class DiscreteSpot:
 
     def differential_evolution__search(
             self, submitted_list: list[float], recycle: Type[Recycle] = None,
-            delta_min: float = -1, delta_max: float = 1,
             submitted_min: float = 0, submitted_max: float = None,
             *args, **kwargs
     ):
@@ -388,12 +387,7 @@ class DiscreteSpot:
             )
             return -1 * trade_yield
 
-        bounds = [
-            [
-                EasyFloat.put_in_range(submitted_min, submitted_max, i + delta_min),
-                EasyFloat.put_in_range(submitted_min, submitted_max, i + delta_max)
-            ] for i in submitted_list
-        ]
+        bounds = [[submitted_min, submitted_max] for _ in range(len(submitted_list))]
 
         result = differential_evolution(target, bounds)
         return result.x, -result.fun
