@@ -35,7 +35,8 @@ def province_new_energy(dayahead: float, realtime: float, realtime_quantity: flo
 
 
 def province_new_energy_with_recycle(
-        dayahead: list, realtime: list, realtime_quantity: list, submitted_quantity: list,
+        dayahead: Union[list, numpy.ndarray], realtime: Union[list, numpy.ndarray],
+        realtime_quantity: Union[list, numpy.ndarray], submitted_quantity: Union[list, numpy.ndarray],
         recycle: Type[Recycle] = None, *args, **kwargs
 ):
     """包含省新能源回收的结算"""
