@@ -28,7 +28,7 @@ from easy_datetime.temporal_utils import timer
 from easy_utils.obj_utils.enumerable_utils import flatten
 
 from finance_utils.electrical.china.spot.rule.recycle import Recycle, AnarchismRecycle, SampleRecycle
-from finance_utils.electrical.china.spot.rule.settlement import province_new_energy_with_recycle
+from finance_utils.electrical.china.spot.rule.settlement import SettlementResult, province_new_energy_with_recycle
 
 from finance_utils.electrical.china.spot.measure.internal.forecast import ForecastCurve, Epsilon
 
@@ -49,26 +49,35 @@ class MarketSample:
         self.realtime_sample = r
         self.quantity_sample = q
 
-    def trade_yield(self, xlist, recycle: Type[Recycle] = None, *args, **kwargs) -> numpy.ndarray:
+    def trade_yield(self, xlist, recycle: Type[Recycle] = None, *args, **kwargs) -> SettlementResult:
         """交易收益"""
-        return numpy.array([
-            province_new_energy_with_recycle(
-                self.dayahead_sample[i],
-                self.realtime_sample[i],
-                self.quantity_sample[i],
-                xlist,
-                recycle=recycle, *args, **kwargs) for i in range(len(self.dayahead_sample))
-        ]).astype(float)
+        result = SettlementResult()
+        for i in range(len(self.dayahead_sample)):
+            result.new_trade(
+                province_new_energy_with_recycle(
+                    self.dayahead_sample[i],
+                    self.realtime_sample[i],
+                    self.quantity_sample[i],
+                    xlist,
+                    recycle=recycle, show_detail=True, *args, **kwargs
+                )
+            )
+        return result
 
-    def differential_evolution__search(self, recycle: Type[Recycle] = None,
+    def differential_evolution__search(self, f: callable = None, recycle: Type[Recycle] = None,
                                        submitted_min: float = 0, submitted_max: float = None,
                                        *args, **kwargs):
         """差分进化搜索"""
 
         def target_fun(xlist):
+            """目标函数"""
+            if f is None:
+                yf = numpy.sum
+            else:
+                yf = f
             xlist = EasyFloat.put_in_range(submitted_min, submitted_max, *xlist)
-            trade_yield = numpy.sum(self.trade_yield(xlist, recycle=recycle, *args, **kwargs))
-            return -1 * trade_yield
+            total_yield = yf(self.trade_yield(xlist, recycle=recycle, *args, **kwargs).to_array())
+            return -1 * total_yield
 
         bounds = [[submitted_min, submitted_max] for _ in range(len(self.dayahead_sample[0]))]
         result = differential_evolution(target_fun, bounds)
@@ -76,8 +85,11 @@ class MarketSample:
 
     def compare(self, xlist, ylist, recycle: Type[Recycle] = None, *args, **kwargs) -> numpy.ndarray:
         """对比"""
-        diff = self.trade_yield(xlist, recycle=recycle, *args, **kwargs) - self.trade_yield(ylist, recycle=recycle,
-                                                                                            *args, **kwargs)
+        diff = self.trade_yield(
+            xlist, recycle=recycle, *args, **kwargs
+        ).to_array() - self.trade_yield(
+            ylist, recycle=recycle, *args, **kwargs
+        ).to_array()
         return numpy.sort(diff)
 
     def compare_dist(self, xlist, ylist, recycle: Type[Recycle] = None, *args, **kwargs) -> HistogramDist:
@@ -115,6 +127,13 @@ class ForecastMarket:
         dayahead_sample = self.dayahead.diff_random_sample(first, end, num, use_random)
         realtime_sample = self.realtime.diff_random_sample(first, end, num, use_random)
         quantity_sample = self.quantity.diff_random_sample(first, end, num, use_random)
+        return MarketSample(dayahead_sample, realtime_sample, quantity_sample)
+
+    def self_related_random_sample(self, pearson: list[float], num: int = 10) -> MarketSample:
+        """自相关随机市场样本"""
+        dayahead_sample = self.dayahead.self_related_random_sample(pearson, num)
+        realtime_sample = self.realtime.self_related_random_sample(pearson, num)
+        quantity_sample = self.quantity.self_related_random_sample(pearson, num)
         return MarketSample(dayahead_sample, realtime_sample, quantity_sample)
 
 
@@ -158,13 +177,19 @@ if __name__ == "__main__":
     # ).tolist())
 
     ts = market.typical_sample().differential_evolution__search(
-        None, 0, 25, trigger_rate=0.05, punishment_rate=0.5
+        None, None, 0, 25, trigger_rate=0.05, punishment_rate=0.5
     )
 
-    s = market.random_sample(num=100, use_random=True).differential_evolution__search(
-        None, 0, 25, trigger_rate=0.05, punishment_rate=0.5)
+    s = market.self_related_random_sample([0, -0.9, -0.8, -0.5], num=100).differential_evolution__search(
+        None, None, 0, 25, trigger_rate=0.05, punishment_rate=0.5)
 
-    pyplot.plot(market.random_sample(num=100, use_random=True).compare(s.y, quantity.value_list).tolist())
-    pyplot.plot(market.random_sample(num=100, use_random=True).compare(ts.y, quantity.value_list).tolist())
+    pyplot.plot(
+        market.self_related_random_sample([0, 0.9, 0.8, 0.5], num=200).compare(s.y, quantity.value_list).tolist())
+    pyplot.plot(
+        market.self_related_random_sample([0, 0.9, 0.8, 0.5], num=200).compare(ts.y, quantity.value_list).tolist())
     pyplot.axhline(0, color='black', linewidth=1)
+    pyplot.legend(["s", "ts"])
     pyplot.show()
+
+    print(s.y.tolist())
+    print(ts.y.tolist())

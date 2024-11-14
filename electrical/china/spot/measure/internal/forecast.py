@@ -22,7 +22,7 @@ from collections import namedtuple
 from data_utils.stochastic_utils.distributions.baseclass import ABCDistribution
 from data_utils.stochastic_utils.distributions.basic_distributions import NormalDistribution
 from data_utils.stochastic_utils.distributions.nonParametricDistribution import HistogramDist
-from data_utils.stochastic_utils.random_process.correlatedRandom import correlated_series, random_correlated_series
+from data_utils.stochastic_utils.random_process.correlatedRandom import correlated_series
 from data_utils.solve_utils.equationNSolve import gradient_descent
 from easy_utils.number_utils.number_utils import EasyFloat
 from easy_utils.obj_utils.enumerable_utils import flatten
@@ -163,12 +163,23 @@ class ForecastCurve:
             sample_list.append(slice_array)
         return numpy.array(sample_list).T.astype(float)
 
-    def self_related_random_sample(self, pearson: list[float], first: float = Epsilon, end: float = 1 - Epsilon,
-                                   num: int = 10,
-                                   use_random=False) -> numpy.ndarray:
+    def self_related_random_sample(self, pearson: list[float], num: int = 10) -> numpy.ndarray:
         """自相关的随机样本"""
-        data = random_correlated_series([p.dist for p in self.original], pearson, num=num)
-        return data
+        sample_list = []
+        for i, p in enumerate(pearson):
+            if i == 0:
+                sample_list.append(self.original[i].dist.rvf(num))
+            else:
+                sample_list.append(
+                    correlated_series(
+                        sample_list[-1],
+                        self.original[i].dist,
+                        pearson[i],
+                    )
+                )
+        return numpy.array([
+            EasyFloat.put_in_range(self.domain_min, self.domain_max, *row) for row in sample_list
+        ]).T.astype(float)
 
     def noised(self, noise_list: list) -> Self:
         """叠加噪音"""
@@ -185,9 +196,9 @@ class ForecastCurve:
 
 
 if __name__ == "__main__":
-    fc = ForecastCurve([NormalDistribution(0, 1), NormalDistribution(0, 1), NormalDistribution(0, 1)],
-                       domain_min=None, domain_max=None)
+    fc = ForecastCurve([NormalDistribution(10, 10), NormalDistribution(20, 10), NormalDistribution(30, 10)],
+                       domain_min=0, domain_max=None)
     # print(fc.diff_random_sample(num=100, use_random=True).tolist())
     # print(fc.random_sample(num=100, use_random=True).tolist())
     # print(fc.geo_random_sample(num=100, use_random=True).tolist())
-    print(fc.self_related_random_sample([0,0.5,-0.5]))
+    print(fc.self_related_random_sample([0, 0.5, -0.9], num=100).tolist())
