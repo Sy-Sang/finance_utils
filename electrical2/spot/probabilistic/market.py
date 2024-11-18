@@ -29,7 +29,7 @@ from easy_utils.obj_utils.enumerable_utils import flatten
 
 from finance_utils.electrical2.spot.rule.recycle import Recycle
 from finance_utils.electrical2.spot.rule.settlement import SettlementResult, province_new_energy_with_recycle
-from finance_utils.electrical2.spot.probabilistic.forecast.curve import ForecastCurve, Epsilon
+from finance_utils.electrical2.spot.probabilistic.curve import ForecastCurve, Epsilon
 
 # 外部模块
 import numpy
@@ -49,11 +49,17 @@ class MarketSample:
         self.quantity_sample = q
 
     def to_array(self) -> numpy.ndarray:
-        return numpy.column_stack((
-            self.dayahead_sample,
-            self.realtime_sample,
-            self.quantity_sample
-        )).astype(float)
+        """转换成矩阵"""
+        # return numpy.column_stack((
+        #     self.dayahead_sample,
+        #     self.realtime_sample,
+        #     self.quantity_sample
+        # )).astype(float)
+        array = []
+        for i,ds in enumerate(self.dayahead_sample):
+            temp_array = [ds,self.realtime_sample[i],self.quantity_sample[i]]
+            array.append(temp_array)
+        return numpy.array(array).astype(float)
 
     def trade_yield(self, xlist, recycle: Type[Recycle] = None, *args, **kwargs) -> SettlementResult:
         """交易收益"""
