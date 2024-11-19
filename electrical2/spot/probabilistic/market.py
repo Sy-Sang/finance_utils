@@ -50,14 +50,9 @@ class MarketSample:
 
     def to_array(self) -> numpy.ndarray:
         """转换成矩阵"""
-        # return numpy.column_stack((
-        #     self.dayahead_sample,
-        #     self.realtime_sample,
-        #     self.quantity_sample
-        # )).astype(float)
         array = []
-        for i,ds in enumerate(self.dayahead_sample):
-            temp_array = [ds,self.realtime_sample[i],self.quantity_sample[i]]
+        for i, ds in enumerate(self.dayahead_sample):
+            temp_array = [ds, self.realtime_sample[i], self.quantity_sample[i]]
             array.append(temp_array)
         return numpy.array(array).astype(float)
 
