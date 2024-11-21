@@ -103,17 +103,17 @@ if __name__ == "__main__":
 
     batch_size = 10
 
-    vl = VanillaLstm(2, 32, 1, 4, None)
+    vl = VanillaLstm(2, 64, 1, 4, None)
 
     x1 = torch.Tensor(numpy.sin(numpy.arange(-6, 6, 0.01)))
     x2 = torch.Tensor(numpy.arange(-6, 6, 0.01))
-    x = torch.stack((x1, x2))
+    x = torch.stack((x2, x1))
 
     y = torch.Tensor(numpy.cos(numpy.arange(-6, 6, 0.01)))
 
     tx1 = torch.Tensor(numpy.sin(numpy.arange(0, 12, 0.01)))
     tx2 = torch.Tensor(numpy.arange(0, 12, 0.01))
-    tx = torch.stack((tx1, tx2))
+    tx = torch.stack((tx2, tx1))
 
     ty = torch.Tensor(numpy.cos(numpy.arange(0, 12, 0.01)))
     trained_vl, _0, _1 = vanilla_lstm_trainer(vl, x, y, batch_size, show_tqdm=True, lr=0.01)
