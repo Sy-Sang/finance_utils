@@ -17,6 +17,7 @@ import pickle
 import json
 from typing import Union, Self, Type
 from collections import namedtuple
+import tqdm
 
 # 项目模块
 
@@ -92,7 +93,7 @@ def vanilla_tester(trained_model: VanillaLstm, test_x: torch.Tensor, test_y: tor
     test_x = test_x.reshape(-1, batch_size, trained_model.input_size).to(trained_model.cuda_device)
     test_y = test_y.reshape(-1, batch_size, trained_model.output_size).to(trained_model.cuda_device)
     with torch.no_grad():
-        y_tensor, _0, _1 = trained_vl(test_x, args[0], args[1])
+        y_tensor, _0, _1 = trained_model(test_x, args[0], args[1])
 
     return y_tensor.reshape(-1), test_y.reshape(-1)
 

@@ -18,6 +18,7 @@ import json
 from typing import Union, Self
 from collections import namedtuple
 import math
+import tqdm
 
 # 项目模块
 
@@ -45,7 +46,7 @@ class PositionalEncoding(nn.Module):
 
 
 class VanillaTransformer(nn.Module):
-    """香草transformer"""
+    """香草(多维输入, 一维输出)transformer"""
 
     def __init__(self, input_size: int, output_size: int, num_layers: int, d_model: int, nhead: int,
                  max_len: int = 5000, dropout: float = 0.1):
@@ -92,6 +93,51 @@ class VanillaTransformer(nn.Module):
         return output
 
 
+def vanilla_transformer_trainer(
+        model: VanillaTransformer,
+        x_tensor: torch.Tensor,
+        y_tensor: torch.Tensor,
+        batch_size: int,
+        epochs: int,
+        lr: float = 0.001,
+        show_tqdm: bool = True
+) -> VanillaTransformer:
+    """香草transformer训练器"""
+    x = x_tensor.reshape(-1, batch_size, model.input_size).to(model.cuda_device)
+    y = y_tensor.reshape(-1, batch_size, model.output_size).to(model.cuda_device)
+    tgt = torch.cat([torch.zeros(1, batch_size, model.input_size), x[:-1]], dim=0).to(model.cuda_device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.MSELoss()
+
+    iterator = tqdm.trange(epochs) if show_tqdm else range(epochs)
+    for _ in iterator:
+        model.train()
+        optimizer.zero_grad()
+        output = model(x, tgt)
+        loss = loss_fn(output, y)
+        loss.backward()
+        optimizer.step()
+
+    return model
+
+
+def vanilla_transformer_tester(
+        model: VanillaTransformer,
+        test_x_tensor: torch.Tensor,
+        batch_size: int,
+) -> torch.Tensor:
+    """输出预测数据"""
+    reshaped_test_x_tensor = test_x_tensor.reshape(-1, batch_size, model.input_size)
+    model.eval()
+    with torch.no_grad():
+        test_src_input = reshaped_test_x_tensor.to(model.cuda_device)
+        test_tgt_input = torch.cat(
+            [torch.zeros(1, batch_size, model.input_size), reshaped_test_x_tensor[:-1]], dim=0
+        ).to(model.cuda_device)
+        predicted = model(test_src_input, test_tgt_input)
+    return predicted
+
+
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     from tqdm import trange
@@ -108,41 +154,44 @@ if __name__ == "__main__":
 
     x1 = torch.Tensor(numpy.sin(numpy.arange(-6, 6, 0.01)))
     x2 = torch.Tensor(numpy.arange(-6, 6, 0.01))
-    x = torch.stack((x1, x2)).reshape(-1, batch_size, input_size).to(model.cuda_device)
-    tgt = torch.cat([torch.zeros(1, batch_size, input_size), x[:-1]], dim=0).to(model.cuda_device)
+    # x = torch.stack((x1, x2)).reshape(-1, batch_size, input_size).to(model.cuda_device)
+    # tgt = torch.cat([torch.zeros(1, batch_size, input_size), x[:-1]], dim=0).to(model.cuda_device)
 
     test_x1 = torch.Tensor(numpy.sin(numpy.arange(0, 12, 0.01)))
     test_x2 = torch.Tensor(numpy.arange(-6, 6, 0.01))
-    test_x = torch.stack((test_x1, test_x2)).reshape(-1, batch_size, input_size)
+    # test_x = torch.stack((test_x1, test_x2)).reshape(-1, batch_size, input_size)
 
-    y = torch.Tensor(numpy.cos(numpy.arange(-6, 6, 0.01))).reshape(-1, batch_size, output_size)
-    test_y = torch.Tensor(numpy.cos(numpy.arange(0, 12, 0.01))).reshape(-1, batch_size, output_size)
+    y = torch.Tensor(numpy.cos(numpy.arange(-6, 6, 0.01)))
+    test_y = numpy.cos(numpy.arange(0, 12, 0.01))
+
+    trained_model = vanilla_transformer_trainer(model, torch.stack((x1, x2)), y, batch_size, 100, 0.001)
+    predicted = vanilla_transformer_tester(trained_model, torch.stack((test_x1, test_x2)), batch_size)
 
     # Initialize model
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-    loss_fn = nn.MSELoss()
-
-    # Training loop
-    epochs = 100
-    for epoch in trange(epochs):
-        model.train()
-        optimizer.zero_grad()
-
-        output = model(x, tgt)
-        loss = loss_fn(output, y)
-        loss.backward()
-        optimizer.step()
-        # scheduler.step()
-
-    # Evaluation
-    model.eval()
-    with torch.no_grad():
-        test_src_input = test_x.to(model.cuda_device)
-        test_tgt_input = torch.cat([torch.zeros(1, batch_size, input_size), test_x[:-1]], dim=0).to(model.cuda_device)
-
-        predicted = model(test_src_input, test_tgt_input)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+    # loss_fn = nn.MSELoss()
+    #
+    # # Training loop
+    # epochs = 100
+    # for epoch in trange(epochs):
+    #     model.train()
+    #     optimizer.zero_grad()
+    #
+    #     output = model(x, tgt)
+    #     loss = loss_fn(output, y)
+    #     loss.backward()
+    #     optimizer.step()
+    #     # scheduler.step()
+    #
+    # # Evaluation
+    # model.eval()
+    # with torch.no_grad():
+    #     test_src_input = test_x.to(model.cuda_device)
+    #     test_tgt_input = torch.cat([torch.zeros(1, batch_size, input_size), test_x[:-1]], dim=0).to(model.cuda_device)
+    #
+    #     predicted = model(test_src_input, test_tgt_input)
     #
     # # Plot results
     plt.plot(test_y.reshape(-1), label='Actual')
