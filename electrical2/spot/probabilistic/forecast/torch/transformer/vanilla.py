@@ -49,7 +49,7 @@ class VanillaTransformer(nn.Module):
     """香草(多维输入, 一维输出)transformer"""
 
     def __init__(self, input_size: int, output_size: int, num_layers: int, d_model: int, nhead: int,
-                 max_len: int = 5000, dropout: float = 0.1):
+                 dim_feedforward: int, max_len: int = 5000, dropout: float = 0.1):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -66,6 +66,7 @@ class VanillaTransformer(nn.Module):
             nhead=nhead,
             num_encoder_layers=num_layers,
             num_decoder_layers=num_layers,
+            dim_feedforward=dim_feedforward,
             dropout=dropout
         )
         self.fc_out = nn.Linear(d_model, output_size)
