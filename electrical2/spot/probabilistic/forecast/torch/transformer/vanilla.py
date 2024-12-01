@@ -42,7 +42,7 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         seq_len = x.size(0)
-        return x + self.encoding[:seq_len, :]
+        return x + self.encoding[:seq_len, :].to(x.device)
 
 
 class VanillaTransformer(nn.Module):
@@ -71,7 +71,6 @@ class VanillaTransformer(nn.Module):
         )
         self.fc_out = nn.Linear(d_model, output_size)
         self.cuda_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.to(self.cuda_device)
 
     def generate_square_subsequent_mask(self, sz):
         return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
@@ -104,22 +103,26 @@ def vanilla_transformer_trainer(
         show_tqdm: bool = True
 ) -> VanillaTransformer:
     """香草transformer训练器"""
+    model_t = model.to(model.cuda_device)
     x = x_tensor.reshape(-1, batch_size, model.input_size).to(model.cuda_device)
     y = y_tensor.reshape(-1, batch_size, model.output_size).to(model.cuda_device)
-    tgt = torch.cat([torch.zeros(1, batch_size, model.input_size), x[:-1]], dim=0).to(model.cuda_device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    tgt = torch.cat([
+        torch.zeros(1, batch_size, model.input_size).to(model.cuda_device),
+        x[:-1]
+    ], dim=0).to(model.cuda_device)
+    optimizer = torch.optim.Adam(model_t.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
 
     iterator = tqdm.trange(epochs) if show_tqdm else range(epochs)
     for _ in iterator:
-        model.train()
+        model_t.train()
         optimizer.zero_grad()
-        output = model(x, tgt)
+        output = model_t(x, tgt)
         loss = loss_fn(output, y)
         loss.backward()
         optimizer.step()
 
-    return model
+    return model_t
 
 
 def vanilla_transformer_tester(
@@ -128,12 +131,15 @@ def vanilla_transformer_tester(
         batch_size: int,
 ) -> torch.Tensor:
     """输出预测数据"""
-    reshaped_test_x_tensor = test_x_tensor.reshape(-1, batch_size, model.input_size)
+    reshaped_test_x_tensor = test_x_tensor.reshape(-1, batch_size, model.input_size).to(model.cuda_device)
     model.eval()
     with torch.no_grad():
         test_src_input = reshaped_test_x_tensor.to(model.cuda_device)
         test_tgt_input = torch.cat(
-            [torch.zeros(1, batch_size, model.input_size), reshaped_test_x_tensor[:-1]], dim=0
+            [
+                torch.zeros(1, batch_size, model.input_size).to(model.cuda_device),
+                reshaped_test_x_tensor[:-1]
+            ], dim=0
         ).to(model.cuda_device)
         predicted = model(test_src_input, test_tgt_input)
     return predicted
