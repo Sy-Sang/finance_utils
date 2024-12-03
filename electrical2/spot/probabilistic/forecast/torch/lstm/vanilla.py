@@ -88,14 +88,15 @@ def vanilla_lstm_trainer(model: VanillaLstm, x: torch.Tensor, y: torch.Tensor, b
     return model, h, c
 
 
-def vanilla_tester(trained_model: VanillaLstm, test_x: torch.Tensor, test_y: torch.Tensor, batch_size: int, *args):
+def vanilla_tester(trained_model: VanillaLstm, test_x: torch.Tensor, batch_size: int, h, c):
     """香草lstm测试"""
     test_x = test_x.reshape(-1, batch_size, trained_model.input_size).to(trained_model.cuda_device)
-    test_y = test_y.reshape(-1, batch_size, trained_model.output_size).to(trained_model.cuda_device)
+    # test_y = test_y.reshape(-1, batch_size, trained_model.output_size).to(trained_model.cuda_device)
+    trained_model.eval()
     with torch.no_grad():
-        y_tensor, _0, _1 = trained_model(test_x, args[0], args[1])
+        y_tensor, _0, _1 = trained_model(test_x, h, c)
 
-    return y_tensor.reshape(-1), test_y.reshape(-1)
+    return y_tensor
 
 
 if __name__ == "__main__":
@@ -119,10 +120,10 @@ if __name__ == "__main__":
     ty = torch.Tensor(numpy.cos(numpy.arange(0, 12, 0.01)))
     trained_vl, _0, _1 = vanilla_lstm_trainer(vl, x, y, batch_size, show_tqdm=True, lr=0.01)
 
-    y, y_hat = vanilla_tester(trained_vl, tx, ty, batch_size, _0, _1)
+    y = vanilla_tester(trained_vl, tx, batch_size, _0, _1)
 
-    pyplot.plot(y, label='Predicted')
-    pyplot.plot(y_hat, label='Actual')
+    pyplot.plot(y.reshape(-1), label='Predicted')
+    pyplot.plot(ty, label='Actual')
 
     pyplot.legend()
     pyplot.show()
