@@ -66,18 +66,19 @@ class MinMax(Norm):
     def f_with_params(
             cls, xlist: Union[list, tuple, numpy.ndarray],
             p,
-            a: Union[float, int, numpy.floating] = 0,
-            b: Union[float, int, numpy.floating] = 1,
-            eps: Union[float, int, numpy.floating] = 0,
             *args, **kwargs):
         xarray = numpy.array(xlist).astype(float)
+        p_min = p[0]
+        p_max = p[1]
+        p_a = p[2]
+        p_b = p[3]
+        p_eps = p[4]
         if max(xarray) == min(xarray):
             yarray = numpy.zeros(len(xlist))
             return yarray
         else:
-            p_min = p[0]
-            p_max = p[1]
-            yarray = (xarray - p_min) * (b - a - 2 * eps) / (p_max - p_min) + a + eps
+
+            yarray = (xarray - p_min) * (p_b - p_a - 2 * p_eps) / (p_max - p_min) + p_a + p_eps
             return yarray
 
     @classmethod
@@ -88,7 +89,7 @@ class MinMax(Norm):
                *args, **kwargs):
         xarray = numpy.array(xlist).astype(float)
         if max(xarray) == min(xarray):
-            numpy.array([])
+            return numpy.array([0, 0, a, b, eps])
         else:
             return numpy.array([min(xarray), max(xarray), a, b, eps]).astype(float)
 
@@ -119,17 +120,17 @@ class ZScore(Norm):
 
     @classmethod
     def f_with_params(cls, x: Union[list, tuple, numpy.ndarray], p,
-                      miu: float = 0,
-                      sigma: float = 1,
                       *args, **kwargs):
-        if numpy.std(x, ddof=1) == 0:
-            y = numpy.array([miu] * len(x))
+        p_mean = p[0]
+        p_std = p[1]
+        p_miu = p[2]
+        p_sigma = p[3]
+        if p_std == 0:
+            y = numpy.array([p_miu] * len(x))
             return y
         else:
-            p_mean = p[0]
-            p_std = p[1]
             z = (numpy.array(x) - p_mean) / p_std
-            y = z * sigma + miu
+            y = z * p_sigma + p_miu
             return y
 
     @classmethod
@@ -138,7 +139,7 @@ class ZScore(Norm):
                sigma: float = 1,
                *args, **kwargs):
         if numpy.std(x, ddof=1) == 0:
-            numpy.array([])
+            return numpy.array([0, 0, 0, 0])
         else:
             return numpy.array([numpy.mean(x), numpy.std(x, ddof=1), miu, sigma]).astype(float)
 
@@ -168,22 +169,22 @@ class RobustScaler(Norm):
             return y
 
     @classmethod
-    def f_with_params(cls, x: Union[list, tuple, numpy.ndarray], p, q0=25, *args, **kwargs):
-        if numpy.std(x, ddof=1) == 0:
+    def f_with_params(cls, x: Union[list, tuple, numpy.ndarray], p, *args, **kwargs):
+        median = p[0]
+        q1 = p[1]
+        q3 = p[2]
+        iqr = p[3]
+        if iqr == 0.0:
             y = numpy.zeros(len(x))
             return y
         else:
-            median = p[0]
-            q1 = p[1]
-            q3 = p[2]
-            iqr = p[3]
             y = (numpy.array(x) - median) / iqr
             return y
 
     @classmethod
     def params(cls, x: Union[list, tuple, numpy.ndarray], q0=25, *args, **kwargs):
         if numpy.std(x, ddof=1) == 0:
-            return numpy.array([])
+            return numpy.array([0, 0, 0, 0])
         else:
             median = numpy.median(x)
             q1 = numpy.percentile(x, q0)

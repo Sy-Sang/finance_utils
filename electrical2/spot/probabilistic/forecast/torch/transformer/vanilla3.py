@@ -71,16 +71,16 @@ class RelativePositionalEncoding(nn.Module):
         return result.mean(dim=-1)
 
 
-class VanillaTransformer(nn.Module):
+class VanillaTransformerEncoder(nn.Module):
     """香草(多维输入, 一维输出)transformer"""
 
-    def __init__(self, input_size: int, output_size: int, num_encoder_layers: int, num_decoder_layers: int,
+    def __init__(self, input_size: int, output_size: int, num_layers,
                  d_model: int, nhead: int,
                  dim_feedforward: int, max_len: int = 5000, dropout: float = 0.1):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
-        self.num_layers = (num_encoder_layers, num_decoder_layers)
+        self.num_layers = num_layers
         self.d_model = d_model
         self.nhead = nhead
 
@@ -89,13 +89,9 @@ class VanillaTransformer(nn.Module):
         self.relative_positional_encoding = RelativePositionalEncoding(d_model, max_len=max_len)
         self.norm = nn.LayerNorm(d_model)
 
-        self.transformer = nn.Transformer(
-            d_model=d_model,
-            nhead=nhead,
-            num_encoder_layers=num_encoder_layers,
-            num_decoder_layers=num_decoder_layers,
-            dim_feedforward=dim_feedforward,
-            dropout=dropout
+        self.transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout),
+            num_layers=num_layers
         )
         self.fc_out = nn.Linear(d_model, output_size)
         self.cuda_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -103,32 +99,29 @@ class VanillaTransformer(nn.Module):
     def generate_square_subsequent_mask(self, sz):
         return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
-    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+    def forward(self, src):
         seq_len, batch_size, _ = src.size()
 
         src = self.input_fc(src)
-        tgt = self.input_fc(tgt)
         src = self.positional_encoding(src)
-        tgt = self.positional_encoding(tgt)
 
         src = src + self.relative_positional_encoding(src)
-        tgt = tgt + self.relative_positional_encoding(tgt)
 
-        src_mask = src_mask if src_mask is not None else self.generate_square_subsequent_mask(src.size(0)).to(
-            src.device)
-        tgt_mask = tgt_mask if tgt_mask is not None else self.generate_square_subsequent_mask(tgt.size(0)).to(
-            tgt.device)
+        # src_mask = src_mask if src_mask is not None else self.generate_square_subsequent_mask(src.size(0)).to(
+        #     src.device)
 
-        transformer_output = self.transformer(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask)
-        transformer_output = transformer_output + src
-        transformer_output = self.norm(transformer_output)
+        encoder_output = self.transformer(src)
+        # encoder_output = encoder_output + src
+        # encoder_output = self.norm(encoder_output)
+        #
+        # output = self.fc_out(encoder_output)
+        output = self.fc_out(encoder_output.mean(dim=0))
 
-        output = self.fc_out(transformer_output)
         return output
 
 
 def vanilla_transformer_trainer(
-        model: VanillaTransformer,
+        model: VanillaTransformerEncoder,
         x_tensor: torch.Tensor,
         y_tensor: torch.Tensor,
         batch_size: int,
@@ -137,7 +130,7 @@ def vanilla_transformer_trainer(
         loser: Type[nn.Module] = nn.MSELoss,
         show_tqdm: bool = True,
         *args, **kwargs
-) -> VanillaTransformer:
+) -> VanillaTransformerEncoder:
     """香草transformer训练器"""
     model_t = model.to(model.cuda_device)
     x = x_tensor.reshape(-1, batch_size, model.input_size).to(model.cuda_device)
@@ -151,12 +144,7 @@ def vanilla_transformer_trainer(
         model_t.train()
         optimizer.zero_grad()
 
-        tgt = torch.cat([
-            torch.zeros(1, batch_size, model.input_size).to(model.cuda_device),
-            x[:-1]
-        ], dim=0).to(model.cuda_device)
-
-        output = model_t(x, tgt)
+        output = model_t(x)
         loss = loss_fn(output, y)
         loss.backward()
         optimizer.step()
@@ -165,33 +153,27 @@ def vanilla_transformer_trainer(
 
 
 def vanilla_transformer_trainer2(
-        model: VanillaTransformer,
+        model: VanillaTransformerEncoder,
         x_tensor: torch.Tensor,
         y_tensor: torch.Tensor,
         batch_size: int,
         epochs: int,
         lr: float = 0.001,
-        L2: float = 1e-5,
         loser: Type[nn.Module] = nn.MSELoss,
         shuffle: bool = True,
-        use_y_tgt: bool = False,
         show_tqdm: bool = True
-) -> VanillaTransformer:
+) -> VanillaTransformerEncoder:
     """香草transformer训练器"""
     model_t = model.to(model.cuda_device)
 
     x_tensor = x_tensor.reshape(-1, batch_size, model.input_size).to(model.cuda_device)
     y_tensor = y_tensor.reshape(-1, batch_size, model.output_size).to(model.cuda_device)
-    # zero_tensor = torch.zeros(1, batch_size, model.input_size).to(model.cuda_device)
-    x_zero_tensor = torch.zeros_like(x_tensor).to(model.cuda_device)
-    y_zero_tensor = torch.zeros_like(x_tensor).to(model.cuda_device)
-    # zero_tensor = torch.zeros(batch_size, model.input_size).to(model.cuda_device)
 
     # Create a TensorDataset and DataLoader for random batching
     dataset = TensorDataset(x_tensor, y_tensor)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    optimizer = torch.optim.Adam(model_t.parameters(), lr=lr, weight_decay=L2)
+    optimizer = torch.optim.Adam(model_t.parameters(), lr=lr)
     loss_fn = loser()
 
     iterator = tqdm.trange(epochs) if show_tqdm else range(epochs)
@@ -200,14 +182,7 @@ def vanilla_transformer_trainer2(
         optimizer.zero_grad()
 
         for x_batch, y_batch in dataloader:
-            if use_y_tgt is False:
-                tgt = x_zero_tensor[:x_batch.shape[0]]
-                tgt[1:] = x_batch[:-1]
-            else:
-                tgt = y_zero_tensor[:x_batch.shape[0]]
-                tgt[1:] = y_batch[:-1]
-
-            output = model_t(x_batch, tgt)
+            output = model_t(x_batch)
             loss = loss_fn(output, y_batch)
             loss.backward()
             optimizer.step()
@@ -216,41 +191,16 @@ def vanilla_transformer_trainer2(
 
 
 def vanilla_transformer_tester(
-        model: VanillaTransformer,
+        model: VanillaTransformerEncoder,
         test_x_tensor: torch.Tensor,
         batch_size: int,
-        use_y_tgt: bool = False,
-        train_y_tensor: torch.Tensor = None
 ) -> torch.Tensor:
     """输出预测数据"""
     reshaped_test_x_tensor = test_x_tensor.reshape(-1, batch_size, model.input_size).to(model.cuda_device)
-    reshaped_test_y_tensor = train_y_tensor.reshape(-1, batch_size, model.output_size).to(model.cuda_device)
-    # if use_y_tgt is False:
-    #     zero_tensor = torch.zeros_like(reshaped_test_x_tensor).to(model.cuda_device)
-    # else:
-    #     reshaped_test_y_tensor = train_y_tensor.reshape(-1, batch_size, model.output_size).to(model.cuda_device)
-    #     zero_tensor = torch.zeros_like(reshaped_test_y_tensor).to(model.cuda_device)
-    zero_tensor = torch.zeros_like(reshaped_test_x_tensor).to(model.cuda_device)
     model.eval()
     with torch.no_grad():
         test_src_input = reshaped_test_x_tensor.to(model.cuda_device)
-
-        # # 初始的目标序列是全零的
-        # test_tgt_input = torch.zeros(1, batch_size, model.input_size).to(model.cuda_device)
-
-        # test_tgt_input = torch.cat(
-        #     [
-        #         torch.zeros(1, batch_size, model.input_size).to(model.cuda_device),
-        #         reshaped_test_x_tensor[:-1]
-        #     ], dim=0
-        # ).to(model.cuda_device)
-        test_tgt_input = zero_tensor.clone()
-        if use_y_tgt is False:
-            test_tgt_input[1:] = reshaped_test_x_tensor[:-1]
-        else:
-            test_tgt_input[1:] = reshaped_test_y_tensor[:-1]
-
-        predicted = model(test_src_input, test_tgt_input)
+        predicted = model(test_src_input)
     return predicted
 
 
@@ -260,13 +210,13 @@ if __name__ == "__main__":
 
     input_size = 2
     d_model = 8
-    nhead = 2
+    nhead = 4
     output_size = 1
     num_layers = 2
 
     batch_size = 6
 
-    model = VanillaTransformer(input_size, output_size, num_layers, 2, d_model, nhead, d_model * 4)
+    model = VanillaTransformerEncoder(input_size, output_size, num_layers, d_model, nhead, d_model * 4)
 
     x1 = torch.Tensor(numpy.sin(numpy.arange(-6, 6, 0.01)))
     x2 = torch.Tensor(numpy.arange(-6, 6, 0.01))
@@ -280,10 +230,9 @@ if __name__ == "__main__":
     y = torch.Tensor(numpy.cos(numpy.arange(-6, 6, 0.01)))
     test_y = numpy.cos(numpy.arange(0, 12, 0.01))
 
-    trained_model = vanilla_transformer_trainer2(model, torch.column_stack((x1, x2)), y, batch_size, 100, 1e-3, 1e-5,
-                                                 nn.MSELoss, use_y_tgt=True)
-    predicted = vanilla_transformer_tester(trained_model, torch.column_stack((test_x1, test_x2)), batch_size,
-                                           use_y_tgt=True, train_y_tensor=y)
+    trained_model = vanilla_transformer_trainer(model, torch.column_stack((x1, x2)), y, batch_size, 100, 1e-3,
+                                                 nn.MSELoss)
+    predicted = vanilla_transformer_tester(trained_model, torch.column_stack((test_x1, test_x2)), batch_size)
 
     # Initialize model
 

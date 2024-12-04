@@ -68,10 +68,6 @@ def grid_norm(m: numpy.ndarray, norm: Type[Norm], dims: list[str], time_dims: in
             cmd_dic[i] = 0
         else:
             k = reformed_dims[k_index]
-            # print([k_counter, k_index])
-            # if "direction" in k:
-            #     cmd_dic[i] = 1
-            # else:
             cmd_dic[i] = k
             dim_dic[k] = one_dim_new_or_cat(dim_dic[k], c)
 
@@ -81,9 +77,6 @@ def grid_norm(m: numpy.ndarray, norm: Type[Norm], dims: list[str], time_dims: in
                 k_index += 1
 
     for k, c in dim_dic.items():
-        # if "direction" in k:
-        #     pass
-        # else:
         p_dic[k] = norm.params(c, *args, **kwargs)
 
     for i, cmd in cmd_dic.items():
@@ -117,7 +110,7 @@ def torch_data_set(pfd: ProvinceForecastData, x_norm_method: Type[Norm], y_norm_
     )["power"]
 
     meteo_data_test_tensor = torch.Tensor(
-        grid_norm(meteo_data, x_norm_method, dims, time_dims, show_tqdm)
+        grid_norm(meteo_data, x_norm_method, dims, time_dims, show_tqdm, *args, **kwargs)
     )
 
     meteo_data_train_tensor = meteo_data_test_tensor[:delta_days * 24]
