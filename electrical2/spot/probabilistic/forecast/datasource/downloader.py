@@ -31,9 +31,19 @@ import numpy
 if __name__ == "__main__":
     root = r"E:\code\github\private\private\db\tencnet\openmeteo\data"
 
-    pfd = ProvinceForecastData("china", "2024-10-1", "2024-10-31")
-    if os.path.exists(f"{root}\\china_cma.pfd"):
-        pass
-    else:
+    province = input("province")
+    stdt = input("stdt")
+    eddt = input("eddt")
+    file_name = input("file_name")
+    save_cma = input("save_cma")
+    save_ecmwf = input("save_ecmwf")
+
+    pfd = ProvinceForecastData(province, stdt, eddt)
+
+    if save_cma == "y":
         pfd.add_new_energy_forecast("cma")
-        pfd.save(f"{root}\\china_cma.pfd")
+
+    if save_ecmwf == "y":
+        pfd.add_new_energy_forecast("ecmwf")
+
+    pfd.save(f"{root}\\{file_name}.pfd")

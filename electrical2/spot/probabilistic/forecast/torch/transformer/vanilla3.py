@@ -111,11 +111,11 @@ class VanillaTransformerEncoder(nn.Module):
         #     src.device)
 
         encoder_output = self.transformer(src)
-        # encoder_output = encoder_output + src
-        # encoder_output = self.norm(encoder_output)
-        #
-        # output = self.fc_out(encoder_output)
-        output = self.fc_out(encoder_output.mean(dim=0))
+        encoder_output = encoder_output + src
+        encoder_output = self.norm(encoder_output)
+
+        output = self.fc_out(encoder_output)
+        # output = self.fc_out(encoder_output.mean(dim=0))
 
         return output
 
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     test_y = numpy.cos(numpy.arange(0, 12, 0.01))
 
     trained_model = vanilla_transformer_trainer(model, torch.column_stack((x1, x2)), y, batch_size, 100, 1e-3,
-                                                 nn.MSELoss)
+                                                nn.MSELoss)
     predicted = vanilla_transformer_tester(trained_model, torch.column_stack((test_x1, test_x2)), batch_size)
 
     # Initialize model
