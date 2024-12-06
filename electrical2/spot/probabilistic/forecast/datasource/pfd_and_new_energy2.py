@@ -49,22 +49,24 @@ def get_reformed_dims(dims: list[str]) -> tuple[list, dict]:
     return reformed_dims, p_dic
 
 
-def grid_norm(m: numpy.ndarray, norm: Type[Norm], dims: list[str], time_dims: int = 7, show_tqdm: bool = True, *args,
+def grid_norm(m: numpy.ndarray, norm: Type[Norm], dims: list[str], non_grid_dims: int = 7, show_tqdm: bool = True,
+              *args,
               **kwargs):
+    """格点归一化"""
     rm = numpy.array([])
     reformed_dims, dim_dic = get_reformed_dims(dims)
     p_dic = copy.deepcopy(dim_dic)
     cmd_dic = {}
     it = range(m.shape[1]) if show_tqdm is False else tqdm.trange(m.shape[1])
 
-    grid_num = (m.shape[1] - time_dims) / len(reformed_dims)
+    grid_num = (m.shape[1] - non_grid_dims) / len(reformed_dims)
     # print(grid_num)
     k_index = 0
     k_counter = 0
 
     for i in it:
         c = m[:, i]
-        if i < time_dims:
+        if i < non_grid_dims:
             cmd_dic[i] = 0
         else:
             k = reformed_dims[k_index]
