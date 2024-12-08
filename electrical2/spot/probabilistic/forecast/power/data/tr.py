@@ -79,6 +79,6 @@ def day2day_hourly_forecast(market: str, target_day: str, counter: int = 10, del
 
 if __name__ == "__main__":
     print(hourly_actual_power("shanxi", "2024-10-10",
-                              *TimeStamp.timestamp_range("2024-10-1", "2024-10-9", "day", 1, True)).tolist())
+                              *TimeStamp.timestamp_range("2024-1-1", "2024-10-9", "day", 1, True)).tolist())
 
     print(day2day_hourly_forecast("shanxi", "2024-10-10", delta=10).tolist())

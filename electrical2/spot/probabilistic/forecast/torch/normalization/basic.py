@@ -77,7 +77,6 @@ class MinMax(Norm):
             yarray = numpy.zeros(len(xlist))
             return yarray
         else:
-
             yarray = (xarray - p_min) * (p_b - p_a - 2 * p_eps) / (p_max - p_min) + p_a + p_eps
             return yarray
 
