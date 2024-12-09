@@ -109,8 +109,9 @@ class ZScore(Norm):
           miu: float = 0,
           sigma: float = 1,
           *args, **kwargs):
-        if numpy.std(x, ddof=1) == 0:
-            y = numpy.array([miu] * len(x))
+        if max(x) == min(x):
+            # y = numpy.array([miu] * len(x))
+            y = numpy.zeros(len(x))
             return y
         else:
             z = (numpy.array(x) - numpy.mean(x)) / numpy.std(x, ddof=1)
@@ -124,8 +125,8 @@ class ZScore(Norm):
         p_std = p[1]
         p_miu = p[2]
         p_sigma = p[3]
-        if p_std == 0:
-            y = numpy.array([p_miu] * len(x))
+        if max(x) == min(x):
+            y = numpy.zeros(len(x))
             return y
         else:
             z = (numpy.array(x) - p_mean) / p_std
@@ -137,7 +138,7 @@ class ZScore(Norm):
                miu: float = 0,
                sigma: float = 1,
                *args, **kwargs):
-        if numpy.std(x, ddof=1) == 0:
+        if max(x) == min(x):
             return numpy.array([0, 0, 0, 0])
         else:
             return numpy.array([numpy.mean(x), numpy.std(x, ddof=1), miu, sigma]).astype(float)
@@ -160,7 +161,7 @@ class RobustScaler(Norm):
         q1 = numpy.percentile(x, q0)
         q3 = numpy.percentile(x, 100 - q0)
         iqr = q3 - q1
-        if iqr == 0:
+        if max(x) == min(x):
             y = numpy.zeros(len(x))
             return y
         else:
@@ -173,7 +174,7 @@ class RobustScaler(Norm):
         q1 = p[1]
         q3 = p[2]
         iqr = p[3]
-        if iqr == 0.0:
+        if max(x) == min(x):
             y = numpy.zeros(len(x))
             return y
         else:
@@ -182,7 +183,7 @@ class RobustScaler(Norm):
 
     @classmethod
     def params(cls, x: Union[list, tuple, numpy.ndarray], q0=25, *args, **kwargs):
-        if numpy.std(x, ddof=1) == 0:
+        if max(x) == min(x):
             return numpy.array([0, 0, 0, 0])
         else:
             median = numpy.median(x)

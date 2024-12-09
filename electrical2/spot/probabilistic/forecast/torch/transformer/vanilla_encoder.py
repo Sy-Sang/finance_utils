@@ -96,6 +96,13 @@ class VanillaTransformerEncoder(nn.Module):
         self.fc_out = nn.Linear(d_model, output_size)
         self.cuda_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    def show_params(self):
+        print(f"self.input_size = {self.input_size}",
+              f"self.output_size = {self.output_size}",
+              f"self.num_layers = {self.num_layers}",
+              f"self.d_model = {self.d_model}",
+              f"self.nhead = {self.nhead}")
+
     def generate_square_subsequent_mask(self, sz):
         return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
@@ -103,9 +110,9 @@ class VanillaTransformerEncoder(nn.Module):
         seq_len, batch_size, _ = src.size()
 
         src = self.input_fc(src)
-        src = self.positional_encoding(src)
-
-        src = src + self.relative_positional_encoding(src)
+        # src = self.positional_encoding(src)
+        #
+        # src = src + self.relative_positional_encoding(src)
 
         # src_mask = src_mask if src_mask is not None else self.generate_square_subsequent_mask(src.size(0)).to(
         #     src.device)
