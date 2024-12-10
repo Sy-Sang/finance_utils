@@ -43,7 +43,7 @@ class PFDInterFace:
         else:
             stday = TimeStamp(farthest)
         edday = target_ts - ["day", 1]
-        timeline = TimeStamp.timestamp_range(stday, edday, "day", 1, True) + [target_ts]
+        timeline = TimeStamp.timestamp_range(stday, edday, "day", 1, True)
         for t in timeline:
             rm = new_or_cat(rm, pfd[slicer[0], slicer[1], 1, 1, t])
         return rm
@@ -147,10 +147,12 @@ class PFDInterFace:
     def time_periodic_encoding(cls, matrix: numpy.ndarray, non_grid_dims: int = 7):
         timeline = [TimeStamp(i) for i in matrix[:, 0]]
         timefeature_list = [[
+            i.timestamp(),
+            (i - ["day", 1]).timestamp(),
             numpy.sin(2 * numpy.pi * i.month / 12),
             numpy.cos(2 * numpy.pi * i.month / 12),
-            numpy.sin(2 * numpy.pi * i.day / (len(i.days_in_year()) / 12)),
-            numpy.cos(2 * numpy.pi * i.day / (len(i.days_in_year()) / 12)),
+            numpy.sin(2 * numpy.pi * i.day / len(i.days_in_month())),
+            numpy.cos(2 * numpy.pi * i.day / len(i.days_in_month())),
             numpy.sin(2 * numpy.pi * i.hour / 24),
             numpy.cos(2 * numpy.pi * i.hour / 24),
             numpy.sin(2 * numpy.pi * i.weekday() / 7),
@@ -191,8 +193,8 @@ if __name__ == "__main__":
     cm = PFDInterFace.time_periodic_encoding(mm[0])
     # print(cm[0].tolist())
     # print(cm.shape)
-    cm = PFDInterFace.norm_by_meteo_key(cm, MinMax, ecmwf_new_energy_args, non_grid_dims=8)
-    for i in range(8):
+    cm = PFDInterFace.norm_by_meteo_key(cm, MinMax, ecmwf_new_energy_args, non_grid_dims=10)
+    for i in range(10):
         # for i in range(7 + 3 * 25, 3 * 25 + 25):
         pyplot.plot(cm[:, i])
         pyplot.show()
