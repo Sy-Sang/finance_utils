@@ -148,7 +148,7 @@ class PFDInterFace:
         timeline = [TimeStamp(i) for i in matrix[:, 0]]
         timefeature_list = [[
             i.timestamp(),
-            (i - ["day", 1]).timestamp(),
+            # (i - ["day", 1]).timestamp(),
             numpy.sin(2 * numpy.pi * i.month / 12),
             numpy.cos(2 * numpy.pi * i.month / 12),
             numpy.sin(2 * numpy.pi * i.day / len(i.days_in_month())),
@@ -160,7 +160,7 @@ class PFDInterFace:
         ] for i in timeline]
 
         timefeature_array = numpy.array(timefeature_list)
-        return numpy.column_stack((timefeature_array, matrix[:, non_grid_dims:]))
+        return numpy.column_stack((timefeature_array, matrix[:, non_grid_dims:])), 9
 
 
 if __name__ == "__main__":

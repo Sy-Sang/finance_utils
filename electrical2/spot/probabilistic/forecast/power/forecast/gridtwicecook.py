@@ -58,6 +58,8 @@ class GridTwiceCookedEncoder:
         self.ynorm = None
         self.batch_size = None
 
+        self.time_dim_len = None
+
     def set_batch_size(self, bs: int = None):
         if bs is None:
             self.batch_size = self.days * 2
@@ -65,13 +67,14 @@ class GridTwiceCookedEncoder:
             self.batch_size = bs
 
     def grid_and_norm(self, xnormer: Type[Norm], ynormer: Type[Norm], meteo_arg: list = cma_new_energy_args):
+        time_encoded, self.time_dim_len = PFDInterFace.time_periodic_encoding(self.m)
         self.grid_norm_m = PFDInterFace.grid_separate(
-            # PFDInterFace.norm_by_meteo_key(PFDInterFace.time_periodic_encoding(self.m), xnormer, meteo_arg, 8),
+            # PFDInterFace.norm_by_meteo_key(time_encoded, xnormer, meteo_arg, self.time_dim_len),
             numpy.apply_along_axis(
-                xnormer.f, axis=0, arr=PFDInterFace.time_periodic_encoding(self.m)
+                xnormer.f, axis=0, arr=time_encoded
             ),
-            cma_new_energy_args,
-            10
+            meteo_arg,
+            self.time_dim_len
         )
         self.y_norm_param = ynormer.params(self.power[:-24])
         self.train_y = ynormer.f(self.power[:-24])
@@ -92,18 +95,18 @@ class GridTwiceCookedEncoder:
         self.model_list = []
         input_size = self.grid_norm_m[0].shape[1]
 
-        model = VanillaTransformerEncoder(
-            input_size=input_size,
-            output_size=output_size,
-            num_layers=num_layers,
-            d_model=d_model,
-            nhead=nhead,
-            dim_feedforward=dim_feedforward,
-            dropout=dropout
-        )
         for i, g in enumerate(self.grid_norm_m):
+            temp_model = VanillaTransformerEncoder(
+                input_size=input_size,
+                output_size=output_size,
+                num_layers=num_layers,
+                d_model=d_model,
+                nhead=nhead,
+                dim_feedforward=dim_feedforward,
+                dropout=dropout
+            )
             trained_model = vanilla_transformer_trainer2(
-                model,
+                temp_model,
                 torch.Tensor(g[:-24]),
                 torch.Tensor(self.train_y),
                 self.batch_size,
