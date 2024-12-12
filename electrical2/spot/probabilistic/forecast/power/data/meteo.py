@@ -77,7 +77,7 @@ class PFDInterFace:
         return forecast
 
     @classmethod
-    def directed_forecast(cls, pfd: ProvinceForecastData, target_day: str, slicer: list, farthest: int = 10):
+    def directed_forecast(cls, pfd: ProvinceForecastData, target_day: str, slicer: list, farthest: int = 9):
         """直接指向目标日的天气预报"""
         td = TimeStamp(target_day)
         stdt = TimeStamp(td) - ["day", farthest]
@@ -148,7 +148,6 @@ class PFDInterFace:
         timeline = [TimeStamp(i) for i in matrix[:, 0]]
         timefeature_list = [[
             i.timestamp(),
-            # (i - ["day", 1]).timestamp(),
             numpy.sin(2 * numpy.pi * i.month / 12),
             numpy.cos(2 * numpy.pi * i.month / 12),
             numpy.sin(2 * numpy.pi * i.day / len(i.days_in_month())),
@@ -159,8 +158,25 @@ class PFDInterFace:
             numpy.cos(2 * numpy.pi * i.weekday() / 7),
         ] for i in timeline]
 
+        # if with_forecast_day is True:
+        #     f_timeline = [TimeStamp(i) for i in matrix[:, 1]]
+        #     for index, j in enumerate(f_timeline):
+        #         timefeature_list[index] += [
+        #             j.timestamp(),
+        #             numpy.sin(2 * numpy.pi * j.month / 12),
+        #             numpy.cos(2 * numpy.pi * j.month / 12),
+        #             numpy.sin(2 * numpy.pi * j.day / len(j.days_in_month())),
+        #             numpy.cos(2 * numpy.pi * j.day / len(j.days_in_month())),
+        #             numpy.sin(2 * numpy.pi * j.hour / 24),
+        #             numpy.cos(2 * numpy.pi * j.hour / 24),
+        #             numpy.sin(2 * numpy.pi * j.weekday() / 7),
+        #             numpy.cos(2 * numpy.pi * j.weekday() / 7),
+        #         ]
+        # else:
+        #     pass
+
         timefeature_array = numpy.array(timefeature_list)
-        return numpy.column_stack((timefeature_array, matrix[:, non_grid_dims:])), 9
+        return numpy.column_stack((timefeature_array, matrix[:, non_grid_dims:])), timefeature_array.shape[1]
 
 
 if __name__ == "__main__":
