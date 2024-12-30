@@ -23,10 +23,11 @@ from collections import namedtuple
 # 外部模块
 import numpy
 
+
 # 代码块
 
-class PayOff:
-    def __init__(self, strike_point:float):
+class Spot:
+    def __init__(self, premium: float, strike_point: float, ):
         self.strike_point = strike_point
 
     def __call__(self, x, *args, **kwargs):
