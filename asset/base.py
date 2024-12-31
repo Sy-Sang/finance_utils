@@ -17,6 +17,8 @@ import pickle
 import json
 from typing import Union, Self
 from collections import namedtuple
+from abc import ABC, abstractmethod
+from enum import Enum
 
 # 项目模块
 
@@ -25,13 +27,20 @@ import numpy
 
 
 # 代码块
+class Asset(ABC):
+    def clone(self):
+        """克隆"""
+        return copy.deepcopy(self)
 
-class Spot:
-    def __init__(self, premium: float, strike_point: float, ):
-        self.strike_point = strike_point
+    @abstractmethod
+    def settlement(self, *args, **kwargs) -> float:
+        """结算现金流"""
+        pass
 
-    def __call__(self, x, *args, **kwargs):
-        return x - self.strike_point
+    @abstractmethod
+    def payoff(self, *args, **kwargs) -> float:
+        """损益"""
+        pass
 
 
 if __name__ == "__main__":
