@@ -20,7 +20,7 @@ from collections import namedtuple
 from enum import Enum
 
 # 项目模块
-from finance_utils.asset.base import Asset
+from finance_utils.asset.base import Asset, PositionType
 
 # 外部模块
 import numpy
@@ -28,31 +28,50 @@ import numpy
 
 # 代码块
 
-class Position(Enum):
-    """头寸"""
-    long = 1
-    short = -1
 
-
-class BaseSpot(Asset):
+class Spot(Asset):
     """现货"""
 
-    def __init__(self, price: float, position: Position = Position.long, shares: float = 1):
+    def __init__(
+            self,
+            name,
+            price: float,
+            # position: PositionType = PositionType.long,
+            shares: float = 1,
+            lot_size: Union[int, float] = None
+    ):
+        super().__init__(name, shares)
         self.price = price
-        self.position = position
-        self.shares = shares
+        # self.position = position
+        self.lot_size = lot_size
 
-    def settlement(self, *args, **kwargs) -> float:
-        return (self.price * self.shares) * (-1 * self.position.value)
+    def __repr__(self):
+        return str({
+            "name": self.name,
+            "type": "Asset.Spot",
+            "price": self.price,
+            "shares": self.shares
+        })
 
-    def payoff(self, x: float, *args, **kwargs) -> float:
+    @Asset.with_shares
+    def purchase_cost(self, position: PositionType, *args, **kwargs):
+        return self.price * position.value * -1
+
+    @Asset.with_shares
+    def payoff(self, x: float, position: PositionType, *args, **kwargs):
         """损益"""
-        return (x - self.price) * self.position.value * self.shares
+        return (x - self.price) * position.value
 
-    def value(self, x, *args, **kwargs):
-        """资产价值"""
-        return x * self.shares * self.position.value
+    def max_purchaseable(self, capital: float):
+        """最大购买量"""
+        if self.lot_size is None:
+            shares = capital / self.price
+        else:
+            shares = (capital // (self.price * self.lot_size)) * self.lot_size
+        my_copy = self.clone()
+        my_copy.shares = shares
+        return my_copy
 
 
 if __name__ == "__main__":
-    print([BaseSpot(100, shares=i).settlement() for i in range(100)])
+    pass

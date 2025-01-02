@@ -20,7 +20,7 @@ from collections import namedtuple
 from enum import Enum
 
 # 项目模块
-from finance_utils.asset.base import Asset
+from finance_utils.asset.base import Asset, LoanRole
 
 # 外部模块
 import numpy
@@ -28,24 +28,24 @@ import numpy
 
 # 代码块
 
-class Role(Enum):
-    """角色"""
-    borrower = -1
-    lender = 1
-
 
 class BaseBond(Asset):
-    def __init__(self, amount: float, rate: float, term: float, role: Role):
+    def __init__(self, amount: float, rate: float, role: LoanRole = LoanRole.borrower, shares: float = 1):
+        super().__init__(shares)
         self.amount = amount
         self.rate = rate
-        self.term = term
         self.role = role
 
-    def settlement(self, *args, **kwargs) -> float:
-        return self.amount * (-1 * self.role.value)
+    @Asset.with_shares
+    def purchase_cost(self, *args, **kwargs):
+        return self.amount * self.role.value
 
-    def payoff(self, *args, **kwargs) -> float:
-        return self.amount * (1 + self.rate) ** self.term * self.role.value
+    @Asset.with_shares
+    def payoff(self, x, *args, **kwargs) -> float:
+        if x > 0:
+            return self.amount * (1 + self.rate) * self.role.value * -1
+        else:
+            return 0
 
 
 # class BondGroup:
@@ -57,5 +57,5 @@ class BaseBond(Asset):
 
 
 if __name__ == "__main__":
-    b = BaseBond(10000, 0.03, 2, Role.lender)
+    b = BaseBond(10000, 0.03, 2, LoanRole.lender)
     print(b.payoff())
