@@ -37,7 +37,7 @@ class BaseBond(Asset):
         self.role = role
 
     @Asset.with_shares
-    def purchase_cost(self, *args, **kwargs):
+    def initial_cost(self, *args, **kwargs):
         return self.amount * self.role.value
 
     @Asset.with_shares

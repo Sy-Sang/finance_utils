@@ -15,19 +15,22 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Union, Self
+from typing import Union, Self, TypeAlias
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import wraps
 
 # 项目模块
+from easy_datetime.timestamp import TimeStamp
 
 # 外部模块
 import numpy
 
-
 # 代码块
+RealNum: TypeAlias = Union[int, float]
+TimeStr: TypeAlias = Union[TimeStamp, str]
+
 
 class PositionType(Enum):
     """头寸类型"""
@@ -50,43 +53,40 @@ class OptionType(Enum):
 class Asset(ABC):
     """金融资产"""
 
-    def __init__(self, name: Union[str, int], shares: Union[int, float]):
+    def __init__(self, name: Union[int, str], lot_size: RealNum, *args, **kwargs):
         self.name = name
-        self.shares = shares
+        self.lot_size = lot_size
 
     def clone(self) -> Self:
         """克隆"""
         return copy.deepcopy(self)
 
-    @staticmethod
-    def with_shares(func):
-        """装饰器，自动将返回值乘以 shares"""
-
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            result = func(self, *args, **kwargs)
-            return result * self.shares
-
-        return wrapper
-
     @abstractmethod
     def __repr__(self):
         pass
 
-    @abstractmethod
-    def purchase_cost(self, position: PositionType, *args, **kwargs):
-        """购入成本"""
-        pass
-
-    @abstractmethod
-    def payoff(self, position: PositionType, *args, **kwargs) -> float:
-        """损益曲线"""
-        pass
-
-    @abstractmethod
-    def max_purchaseable(self, *args, **kwargs) -> Self:
+    def max_purchase_quantity(self, price: RealNum, capital: RealNum, *args, **kwargs):
         """最大购买量"""
-        pass
+        if self.lot_size is None:
+            shares = capital / price
+        else:
+            shares = (capital // (price * self.lot_size)) * self.lot_size
+        return shares
+
+    # @abstractmethod
+    # def initial_cost(self, *args, **kwargs) -> float:
+    #     """购入成本"""
+    #     pass
+    #
+    # @abstractmethod
+    # def payoff(self, *args, **kwargs) -> float:
+    #     """损益曲线"""
+    #     pass
+    #
+    # @abstractmethod
+    # def max_purchase_quantity(self, *args, **kwargs) -> float:
+    #     """最大购买量"""
+    #     pass
 
 
 if __name__ == "__main__":
