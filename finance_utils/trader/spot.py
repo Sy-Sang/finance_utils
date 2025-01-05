@@ -112,9 +112,8 @@ if __name__ == "__main__":
     from matplotlib import pyplot
 
     timeline = TimeStamp.timestamp_range("2024-1-1", "2024-2-1", "hour", 1)
-    p = [numpy.random.normal(0, 0.015) for _ in range(len(timeline))]
-    p1 = [max(1, numpy.random.normal(0, 0.01)) for _ in range(len(timeline))]
-    
+    p = [numpy.random.normal(100, 10) for _ in range(len(timeline))]
+    p1 = [numpy.random.normal(100, 20) for _ in range(len(timeline))]
 
     s = Spot(10001, 100)
     s1 = Spot(10002, 100)
