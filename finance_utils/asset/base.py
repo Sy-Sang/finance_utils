@@ -15,7 +15,7 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Union, Self, TypeAlias
+from typing import Any, Union, Self, TypeAlias
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -53,9 +53,9 @@ class OptionType(Enum):
 class Asset(ABC):
     """金融资产"""
 
-    def __init__(self, name: Union[int, str], lot_size: RealNum, *args, **kwargs):
-        self.name = name
-        self.lot_size = lot_size
+    def __init__(self, name: Any, lot_size: RealNum, *args, **kwargs):
+        self.name = str(name)
+        self.lot_size = float(lot_size)
 
     def clone(self) -> Self:
         """克隆"""
@@ -73,20 +73,15 @@ class Asset(ABC):
             shares = (capital // (price * self.lot_size)) * self.lot_size
         return shares
 
-    # @abstractmethod
-    # def initial_cost(self, *args, **kwargs) -> float:
-    #     """购入成本"""
-    #     pass
-    #
-    # @abstractmethod
-    # def payoff(self, *args, **kwargs) -> float:
-    #     """损益曲线"""
-    #     pass
-    #
-    # @abstractmethod
-    # def max_purchase_quantity(self, *args, **kwargs) -> float:
-    #     """最大购买量"""
-    #     pass
+    @abstractmethod
+    def purchase(self, *args, **kwargs):
+        """买入"""
+        pass
+
+    @abstractmethod
+    def sell(self, *args, **kwargs):
+        """卖出"""
+        pass
 
 
 if __name__ == "__main__":

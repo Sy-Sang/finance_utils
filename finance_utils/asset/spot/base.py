@@ -21,15 +21,13 @@ from enum import Enum
 
 # 项目模块
 from finance_utils.asset.base import *
+from finance_utils.trader.base import TradeBook, Trader
 
 # 外部模块
 import numpy
 
+
 # 代码块
-
-
-SpotElement = namedtuple("SpotElement", ["name", "lot_size"])
-TradeBookUnit = namedtuple("TradeBookUnit", ["timestamp", "price", "shares", "position"])
 
 
 class Spot(Asset):
@@ -41,24 +39,80 @@ class Spot(Asset):
             lot_size: RealNum = None
     ):
         super().__init__(name, lot_size)
-        self.elements = SpotElement(self.name, self.lot_size)
+        self.elements = (self.name, self.lot_size)
         self.trade_book = []
 
     def __repr__(self):
         return str(self.elements)
 
-    @staticmethod
-    def payoff(price: RealNum, x: RealNum, position: PositionType, *args, **kwargs):
+    @classmethod
+    def payoff(cls, initial_price: float, x: float, position: PositionType, *args, **kwargs):
         """损益"""
-        return (x - price) * position.value
+        return (x - initial_price) * position.value
+
+    def purchase(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
+                 *args, **kwargs):
+        available_capital = trader.capital if capital is None else min(trader.capital, capital)
+        available_quantity = self.max_purchase_quantity(price, available_capital)
+        if available_quantity > 0:
+            trader.capital -= price * available_quantity
+            if self.name in trader.position:
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
+            else:
+                trader.position[self.name] = SpotTradeBook(self)
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
+
+    def sell(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
+             timestamp: TimeStr, *args, **kwargs):
+        if self.name in trader.position:
+            in_position_quantity = trader.position[self.name].in_position_quantity(timestamp)
+            if quantity is None:
+                available_quantity = in_position_quantity
+            else:
+                available_quantity = min(quantity, in_position_quantity)
+            if available_quantity > 0:
+                trader.capital += price * available_quantity
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.short)
+            else:
+                pass
+        else:
+            pass
+
+    def percentage_purchase(self, trader: Trader, price: float, capital_percentage: float,
+                            timestamp: TimeStr, *args,
+                            **kwargs):
+        """按比例买入"""
+        capital = trader.capital * capital_percentage
+        self.purchase(trader, price, capital, timestamp, *args, **kwargs)
+
+    def percentage_sell(self, trader: Trader, price: float,
+                        quantity_percentage: float,
+                        timestamp: TimeStr, must_int: bool = True, *args, **kwargs):
+        """按比例卖出"""
+        quantity = trader.position[self.name].in_position_quantity(timestamp) * quantity_percentage
+        quantity = quantity // 1 if must_int is True else quantity
+        self.sell(trader, price, quantity, timestamp, *args, **kwargs)
 
 
-class SpotTradeBook:
+class SpotTradeUnit:
+    """现货交易记录单元"""
+
+    def __init__(self, timestamp: TimeStr, price: float, shares: RealNum, position: PositionType):
+        self.timestamp = TimeStamp(timestamp)
+        self.price = price
+        self.shares = float(shares)
+        self.position = position
+
+    def __repr__(self):
+        return str([self.timestamp, self.shares, self.position])
+
+
+class SpotTradeBook(TradeBook):
     """现货交易记录"""
 
     def __init__(self, asset: Spot):
         self.asset = asset.clone()
-        self.book: list[TradeBookUnit] = []
+        self.book: list[SpotTradeUnit] = []
 
     def __repr__(self):
         return f"{self.asset}:{self.book}"
@@ -69,28 +123,98 @@ class SpotTradeBook:
         else:
             return False
 
+    def sort(self):
+        """对订单记录进行排序"""
+        time_array = numpy.array([i.timestamp.timestamp() for i in self.book])
+        is_sorted = numpy.all(time_array[:-1] <= time_array[1:])
+        if is_sorted:
+            pass
+        else:
+            sort_index = numpy.argsort(time_array)
+            sorted_book = []
+            for i in sort_index:
+                sorted_book.append(self.book[i])
+            self.book = sorted_book
+
     def append(self, timestamp: TimeStr, price: RealNum, shares: RealNum, position: PositionType):
         self.book.append(
-            TradeBookUnit(TimeStamp(timestamp), price, shares, position)
+            SpotTradeUnit(TimeStamp(timestamp), float(price), float(shares), position)
         )
+        self.sort()
 
-    def long_quantity(self):
-        return sum([i.shares for i in self.book if i.position == PositionType.long])
+    def timestamp_domain(self) -> tuple[TimeStamp, TimeStamp]:
+        """订单表时间区间"""
+        return self.book[0].timestamp, self.book[-1].timestamp
 
-    def short_quantity(self):
-        return sum([i.shares for i in self.book if i.position == PositionType.short])
+    def interval_book(self, stdt: TimeStr, eddt: TimeStr) -> list[SpotTradeUnit]:
+        """按时间区间的交易记录"""
+        time_array = numpy.array([i.timestamp.timestamp() for i in self.book])
+        interval_index, *_ = numpy.where(
+            (time_array >= TimeStamp(stdt).timestamp()) & (time_array <= TimeStamp(eddt).timestamp())
+        )
+        sorted_book = []
+        for i in interval_index:
+            sorted_book.append(self.book[i])
+        return sorted_book
 
-    def holding_cost(self):
+    def get_book_item(self, *args) -> list[SpotTradeUnit]:
+        t_domain = self.timestamp_domain()
+        if len(args) == 0:
+            return copy.deepcopy(self.book)
+        elif len(args) == 1:
+            return self.interval_book(t_domain[0], args[0])
+        else:
+            return self.interval_book(args[0], args[1])
+
+    def long_quantity(self, *args) -> float:
+        """买入量"""
+        return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.long])
+
+    def short_quantity(self, *args) -> float:
+        """卖出量"""
+        return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.short])
+
+    def in_position_quantity(self, *args):
+        return self.long_quantity(*args) - self.short_quantity(*args)
+
+    def holding_cost(self, *args) -> float:
+        """平均持仓成本"""
         long_array = numpy.array([
-            [i.price, i.shares] for i in self.book if i.position == PositionType.long
+            [i.price, i.shares] for i in self.get_book_item(*args) if i.position == PositionType.long
         ]).astype(float)
         short_book = numpy.array([
-            [i.price, i.shares] for i in self.book if i.position == PositionType.short
+            [i.price, i.shares] for i in self.get_book_item(*args) if i.position == PositionType.short
         ]).astype(float)
         amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
         quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
         return amount / quantity
 
+    def value(self, price: float, *args):
+        return self.in_position_quantity(*args) * price
+
+    def payoff(self, x: float, *args) -> float:
+        """损益函数"""
+        cost = self.holding_cost(*args)
+        return (x - cost) * self.in_position_quantity(*args)
+
+    def simplify(self):
+        """化简"""
+        shares = self.in_position_quantity()
+        if shares > 0:
+            stdt, eddt = self.timestamp_domain()
+            cost = self.holding_cost()
+            self.book = [SpotTradeUnit(eddt, cost, shares, PositionType.long)]
+        else:
+            self.book = []
+
 
 if __name__ == "__main__":
-    pass
+    test_trader = Trader(100000)
+    s = Spot("10001", 100)
+    # s.trade().purchase(trader, 100, None, )
+    s.percentage_purchase(test_trader, 101, 0.5, "2024-10-1")
+    s.percentage_sell(test_trader, 102, 0.5, "2024-10-2")
+    s.percentage_sell(test_trader, 103, 0.5, "2024-10-3")
+    s.percentage_sell(test_trader, 104, 1, "2024-10-3")
+    print(test_trader)
+    print(test_trader.net_worth_rate(**{"10001": {"price": 100}}))
