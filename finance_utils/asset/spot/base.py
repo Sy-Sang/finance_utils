@@ -50,8 +50,8 @@ class Spot(Asset):
         """损益"""
         return (x - initial_price) * position.value
 
-    def purchase(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
-                 *args, **kwargs):
+    def be_purchased(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
+                     *args, **kwargs):
         available_capital = trader.capital if capital is None else min(trader.capital, capital)
         available_quantity = self.max_purchase_quantity(price, available_capital)
         if available_quantity > 0:
@@ -62,8 +62,8 @@ class Spot(Asset):
                 trader.position[self.name] = SpotTradeBook(self)
                 trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
 
-    def sell(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
-             timestamp: TimeStr, *args, **kwargs):
+    def be_sold(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
+                timestamp: TimeStr, *args, **kwargs):
         if self.name in trader.position:
             in_position_quantity = trader.position[self.name].in_position_quantity(timestamp)
             if quantity is None:
@@ -83,7 +83,7 @@ class Spot(Asset):
                             **kwargs):
         """按比例买入"""
         capital = trader.capital * capital_percentage
-        self.purchase(trader, price, capital, timestamp, *args, **kwargs)
+        self.be_purchased(trader, price, capital, timestamp, *args, **kwargs)
 
     def percentage_sell(self, trader: Trader, price: float,
                         quantity_percentage: float,
@@ -91,7 +91,7 @@ class Spot(Asset):
         """按比例卖出"""
         quantity = trader.position[self.name].in_position_quantity(timestamp) * quantity_percentage
         quantity = quantity // 1 if must_int is True else quantity
-        self.sell(trader, price, quantity, timestamp, *args, **kwargs)
+        self.be_sold(trader, price, quantity, timestamp, *args, **kwargs)
 
 
 class SpotTradeUnit:
@@ -104,7 +104,7 @@ class SpotTradeUnit:
         self.position = position
 
     def __repr__(self):
-        return str([self.timestamp, self.shares, self.position])
+        return str([self.timestamp, self.price, self.shares, self.position])
 
 
 class SpotTradeBook(TradeBook):
@@ -179,12 +179,15 @@ class SpotTradeBook(TradeBook):
 
     def holding_cost(self, *args) -> float:
         """平均持仓成本"""
-        long_array = numpy.array([
+        long_list = [
             [i.price, i.shares] for i in self.get_book_item(*args) if i.position == PositionType.long
-        ]).astype(float)
-        short_book = numpy.array([
+        ]
+        short_list = [
             [i.price, i.shares] for i in self.get_book_item(*args) if i.position == PositionType.short
-        ]).astype(float)
+        ]
+
+        long_array = numpy.array(long_list).astype(float) if long_list else numpy.array([[0, 0]])
+        short_book = numpy.array(short_list).astype(float) if short_list else numpy.array([[0, 0]])
         amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
         quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
         return amount / quantity

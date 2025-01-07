@@ -85,7 +85,7 @@ class Trader:
     def net_worth_rate(self, **kwargs):
         """交易净值"""
         value = self.value(**kwargs)
-        return value / self.investment_flow
+        return value / self.total_investment()
 
     def payoff(self, **kwargs):
         """损益函数"""
