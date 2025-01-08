@@ -39,18 +39,20 @@ class Spot(Asset):
             lot_size: RealNum = None
     ):
         super().__init__(name, lot_size)
-        self.elements = (self.name, self.lot_size)
-        self.trade_book = []
+        self.constructor = {
+            "name": self.name,
+            "lot_size": self.lot_size
+        }
 
     def __repr__(self):
-        return str(self.elements)
+        return str(self.constructor)
 
     @classmethod
     def payoff(cls, initial_price: float, x: float, position: PositionType, *args, **kwargs):
         """损益"""
         return (x - initial_price) * position.value
 
-    def be_purchased(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
+    def purchased_to(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
                      *args, **kwargs):
         available_capital = trader.capital if capital is None else min(trader.capital, capital)
         available_quantity = self.max_purchase_quantity(price, available_capital)
@@ -62,7 +64,7 @@ class Spot(Asset):
                 trader.position[self.name] = SpotTradeBook(self)
                 trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
 
-    def be_sold(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
+    def sold_to(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
                 timestamp: TimeStr, *args, **kwargs):
         if self.name in trader.position:
             in_position_quantity = trader.position[self.name].in_position_quantity(timestamp)
@@ -83,7 +85,7 @@ class Spot(Asset):
                             **kwargs):
         """按比例买入"""
         capital = trader.capital * capital_percentage
-        self.be_purchased(trader, price, capital, timestamp, *args, **kwargs)
+        self.purchased_to(trader, price, capital, timestamp, *args, **kwargs)
 
     def percentage_sell(self, trader: Trader, price: float,
                         quantity_percentage: float,
@@ -91,7 +93,7 @@ class Spot(Asset):
         """按比例卖出"""
         quantity = trader.position[self.name].in_position_quantity(timestamp) * quantity_percentage
         quantity = quantity // 1 if must_int is True else quantity
-        self.be_sold(trader, price, quantity, timestamp, *args, **kwargs)
+        self.sold_to(trader, price, quantity, timestamp, *args, **kwargs)
 
 
 class SpotTradeUnit:

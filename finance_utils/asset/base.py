@@ -74,12 +74,12 @@ class Asset(ABC):
         return shares
 
     @abstractmethod
-    def be_purchased(self, *args, **kwargs):
+    def purchased_to(self, *args, **kwargs):
         """买入"""
         pass
 
     @abstractmethod
-    def be_sold(self, *args, **kwargs):
+    def sold_to(self, *args, **kwargs):
         """卖出"""
         pass
 
