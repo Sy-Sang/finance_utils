@@ -24,7 +24,19 @@ from abc import ABC, abstractmethod
 # 外部模块
 import numpy
 
+
 # 代码块
+
+class PriceProcess:
+
+    @abstractmethod
+    def __repr__(self):
+        pass
+
+    @abstractmethod
+    def get_price(self, *args, **kwargs):
+        """获取价格"""
+        pass
 
 
 if __name__ == "__main__":

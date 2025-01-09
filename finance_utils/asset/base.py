@@ -53,9 +53,10 @@ class OptionType(Enum):
 class Asset(ABC):
     """金融资产"""
 
-    def __init__(self, name: Any, lot_size: RealNum, *args, **kwargs):
+    def __init__(self, name: Any, lot_size: RealNum, trade_delta, *args, **kwargs):
         self.name = str(name)
         self.lot_size = float(lot_size)
+        self.trade_delta = trade_delta
 
     def clone(self) -> Self:
         """克隆"""

@@ -30,12 +30,53 @@ import numpy
 InvestmentRec = namedtuple("InvestmentRec", ["timestamp", "investment"])
 
 
+class TradeBookUnit(ABC):
+    """交易记录单元"""
+
+    def __init__(self, timestamp: TimeStr):
+        self.timestamp = TimeStamp(timestamp)
+
+
 class TradeBook(ABC):
     """交易记录"""
+
+    def __init__(self):
+        self.book: list[TradeBookUnit] = []
+
+    def clone(self):
+        """克隆"""
+        return copy.deepcopy(self)
+
+    def sort(self):
+        """对订单记录进行排序"""
+        time_array = numpy.array([i.timestamp.timestamp() for i in self.book])
+        is_sorted = numpy.all(time_array[:-1] <= time_array[1:])
+        if is_sorted:
+            pass
+        else:
+            sort_index = numpy.argsort(time_array)
+            sorted_book = []
+            for i in sort_index:
+                sorted_book.append(self.book[i])
+            self.book = sorted_book
 
     @abstractmethod
     def append(self, *args, **kwargs):
         """添加交易记录"""
+        pass
+
+    def timestamp_domain(self) -> tuple[TimeStamp, TimeStamp]:
+        """订单表时间区间"""
+        return self.book[0].timestamp, self.book[-1].timestamp
+
+    @abstractmethod
+    def long_quantity(self, *args, **kwargs) -> float:
+        """多头持仓"""
+        pass
+
+    @abstractmethod
+    def short_quantity(self, *args, **kwargs) -> float:
+        """空头持仓"""
         pass
 
     @abstractmethod
@@ -51,6 +92,11 @@ class TradeBook(ABC):
     @abstractmethod
     def payoff(self, *args, **kwargs) -> float:
         """持仓损益"""
+        pass
+
+    @abstractmethod
+    def simplify(self, *args, **kwargs):
+        """重整交易记录"""
         pass
 
 

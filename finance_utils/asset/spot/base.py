@@ -21,7 +21,7 @@ from enum import Enum
 
 # 项目模块
 from finance_utils.asset.base import *
-from finance_utils.trader.base import TradeBook, Trader
+from finance_utils.trader.base import TradeBook, TradeBookUnit, Trader
 
 # 外部模块
 import numpy
@@ -29,78 +29,11 @@ import numpy
 
 # 代码块
 
-
-class Spot(Asset):
-    """现货"""
-
-    def __init__(
-            self,
-            name,
-            lot_size: RealNum = None
-    ):
-        super().__init__(name, lot_size)
-        self.constructor = {
-            "name": self.name,
-            "lot_size": self.lot_size
-        }
-
-    def __repr__(self):
-        return str(self.constructor)
-
-    @classmethod
-    def payoff(cls, initial_price: float, x: float, position: PositionType, *args, **kwargs):
-        """损益"""
-        return (x - initial_price) * position.value
-
-    def purchased_to(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
-                     *args, **kwargs):
-        available_capital = trader.capital if capital is None else min(trader.capital, capital)
-        available_quantity = self.max_purchase_quantity(price, available_capital)
-        if available_quantity > 0:
-            trader.capital -= price * available_quantity
-            if self.name in trader.position:
-                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
-            else:
-                trader.position[self.name] = SpotTradeBook(self)
-                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
-
-    def sold_to(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
-                timestamp: TimeStr, *args, **kwargs):
-        if self.name in trader.position:
-            in_position_quantity = trader.position[self.name].in_position_quantity(timestamp)
-            if quantity is None:
-                available_quantity = in_position_quantity
-            else:
-                available_quantity = min(quantity, in_position_quantity)
-            if available_quantity > 0:
-                trader.capital += price * available_quantity
-                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.short)
-            else:
-                pass
-        else:
-            pass
-
-    def percentage_purchase(self, trader: Trader, price: float, capital_percentage: float,
-                            timestamp: TimeStr, *args,
-                            **kwargs):
-        """按比例买入"""
-        capital = trader.capital * capital_percentage
-        self.purchased_to(trader, price, capital, timestamp, *args, **kwargs)
-
-    def percentage_sell(self, trader: Trader, price: float,
-                        quantity_percentage: float,
-                        timestamp: TimeStr, must_int: bool = True, *args, **kwargs):
-        """按比例卖出"""
-        quantity = trader.position[self.name].in_position_quantity(timestamp) * quantity_percentage
-        quantity = quantity // 1 if must_int is True else quantity
-        self.sold_to(trader, price, quantity, timestamp, *args, **kwargs)
-
-
-class SpotTradeUnit:
+class SpotTradeBookUnit(TradeBookUnit):
     """现货交易记录单元"""
 
     def __init__(self, timestamp: TimeStr, price: float, shares: RealNum, position: PositionType):
-        self.timestamp = TimeStamp(timestamp)
+        super().__init__(timestamp)
         self.price = price
         self.shares = float(shares)
         self.position = position
@@ -112,9 +45,10 @@ class SpotTradeUnit:
 class SpotTradeBook(TradeBook):
     """现货交易记录"""
 
-    def __init__(self, asset: Spot):
+    def __init__(self, asset: Asset):
+        super().__init__()
         self.asset = asset.clone()
-        self.book: list[SpotTradeUnit] = []
+        self.book: list[SpotTradeBookUnit]
 
     def __repr__(self):
         return f"{self.asset}:{self.book}"
@@ -125,30 +59,13 @@ class SpotTradeBook(TradeBook):
         else:
             return False
 
-    def sort(self):
-        """对订单记录进行排序"""
-        time_array = numpy.array([i.timestamp.timestamp() for i in self.book])
-        is_sorted = numpy.all(time_array[:-1] <= time_array[1:])
-        if is_sorted:
-            pass
-        else:
-            sort_index = numpy.argsort(time_array)
-            sorted_book = []
-            for i in sort_index:
-                sorted_book.append(self.book[i])
-            self.book = sorted_book
-
     def append(self, timestamp: TimeStr, price: RealNum, shares: RealNum, position: PositionType):
         self.book.append(
-            SpotTradeUnit(TimeStamp(timestamp), float(price), float(shares), position)
+            SpotTradeBookUnit(TimeStamp(timestamp), float(price), float(shares), position)
         )
         self.sort()
 
-    def timestamp_domain(self) -> tuple[TimeStamp, TimeStamp]:
-        """订单表时间区间"""
-        return self.book[0].timestamp, self.book[-1].timestamp
-
-    def interval_book(self, stdt: TimeStr, eddt: TimeStr) -> list[SpotTradeUnit]:
+    def interval_book(self, stdt: TimeStr, eddt: TimeStr) -> list[SpotTradeBookUnit]:
         """按时间区间的交易记录"""
         time_array = numpy.array([i.timestamp.timestamp() for i in self.book])
         interval_index, *_ = numpy.where(
@@ -159,7 +76,8 @@ class SpotTradeBook(TradeBook):
             sorted_book.append(self.book[i])
         return sorted_book
 
-    def get_book_item(self, *args) -> list[SpotTradeUnit]:
+    def get_book_item(self, *args) -> list[SpotTradeBookUnit]:
+        """按时间顺序获取部分交易记录"""
         t_domain = self.timestamp_domain()
         if len(args) == 0:
             return copy.deepcopy(self.book)
@@ -169,11 +87,9 @@ class SpotTradeBook(TradeBook):
             return self.interval_book(args[0], args[1])
 
     def long_quantity(self, *args) -> float:
-        """买入量"""
         return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.long])
 
     def short_quantity(self, *args) -> float:
-        """卖出量"""
         return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.short])
 
     def in_position_quantity(self, *args):
@@ -192,7 +108,12 @@ class SpotTradeBook(TradeBook):
         short_book = numpy.array(short_list).astype(float) if short_list else numpy.array([[0, 0]])
         amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
         quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
-        return amount / quantity
+        if quantity > 0:
+            return amount / quantity
+        elif quantity < 0:
+            raise Exception(f"{quantity} < 0")
+        else:
+            return numpy.nan
 
     def value(self, price: float, *args):
         return self.in_position_quantity(*args) * price
@@ -203,14 +124,103 @@ class SpotTradeBook(TradeBook):
         return (x - cost) * self.in_position_quantity(*args)
 
     def simplify(self):
-        """化简"""
         shares = self.in_position_quantity()
+        stdt, eddt = self.timestamp_domain()
         if shares > 0:
-            stdt, eddt = self.timestamp_domain()
             cost = self.holding_cost()
-            self.book = [SpotTradeUnit(eddt, cost, shares, PositionType.long)]
+            self.book = [SpotTradeBookUnit(stdt, cost, shares, PositionType.long)]
+        elif shares < 0:
+            raise Exception(f"{shares} < 0")
         else:
-            self.book = []
+            self.book = [SpotTradeBookUnit(stdt, 0, shares, PositionType.long)]
+
+
+class Spot(Asset):
+    """现货"""
+
+    def __init__(
+            self,
+            name,
+            lot_size: RealNum = None,
+            trade_delta: Union[list, tuple] = ("day", 0)
+    ):
+        super().__init__(name, lot_size, trade_delta)
+        self.constructor = {
+            "name": self.name,
+            "lot_size": self.lot_size,
+            "trade_delta": self.trade_delta
+        }
+
+    def __repr__(self):
+        return str(self.constructor)
+
+    def to_spot_trade_book(self, book: TradeBook) -> SpotTradeBook:
+        """转换为spotbook"""
+        spot_book = SpotTradeBook(self)
+        for i, b in enumerate(book.book):
+            if isinstance(b, SpotTradeBookUnit):
+                spot_book.append(b.timestamp, b.price, b.shares, b.position)
+        return spot_book
+
+    @classmethod
+    def payoff(cls, initial_price: float, x: float, position: PositionType, *args, **kwargs):
+        """损益"""
+        return (x - initial_price) * position.value
+
+    def purchased_to(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
+                     *args, **kwargs):
+        available_capital = trader.capital if capital is None else min(trader.capital, capital)
+        available_quantity = self.max_purchase_quantity(price, available_capital)
+        if available_quantity > 0:
+            trader.capital -= price * available_quantity
+            if self.name in trader.position:
+                book = self.to_spot_trade_book(trader.position[self.name])
+                book.append(timestamp, price, available_quantity, PositionType.long)
+                # trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
+                trader.position[self.name] = book.clone()
+            else:
+                book = SpotTradeBook(self)
+                book.append(timestamp, price, available_quantity, PositionType.long)
+                trader.position[self.name] = book.clone()
+                # trader.position[self.name] = SpotTradeBook(self)
+                # trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
+            return available_quantity
+        else:
+            return 0
+
+    def sold_to(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
+                timestamp: TimeStr, *args, **kwargs):
+        if self.name in trader.position:
+            in_position_quantity = trader.position[self.name].in_position_quantity(
+                TimeStamp(timestamp).get_date() - self.trade_delta
+            )
+            if quantity is None:
+                available_quantity = in_position_quantity
+            else:
+                available_quantity = min(quantity, in_position_quantity)
+            if available_quantity > 0:
+                trader.capital += price * available_quantity
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.short)
+                return available_quantity
+            else:
+                return 0
+        else:
+            return -1
+
+    def percentage_purchase(self, trader: Trader, price: float, capital_percentage: float,
+                            timestamp: TimeStr, *args,
+                            **kwargs):
+        """按比例买入"""
+        capital = trader.capital * capital_percentage
+        self.purchased_to(trader, price, capital, timestamp, *args, **kwargs)
+
+    def percentage_sell(self, trader: Trader, price: float,
+                        quantity_percentage: float,
+                        timestamp: TimeStr, must_int: bool = True, *args, **kwargs):
+        """按比例卖出"""
+        quantity = trader.position[self.name].in_position_quantity(timestamp) * quantity_percentage
+        quantity = quantity // 1 if must_int is True else quantity
+        self.sold_to(trader, price, quantity, timestamp, *args, **kwargs)
 
 
 if __name__ == "__main__":

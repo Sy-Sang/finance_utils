@@ -28,15 +28,17 @@ from finance_utils.asset.base import *
 from finance_utils.asset.spot.base import Spot
 from finance_utils.trader.base import Trader
 
+from finance_utils.process.prices.base import PriceProcess
+
 # 外部模块
 import numpy
 
 # 代码块
 
-PathValue = namedtuple("PathValue", ["value", "dic"])
+PricePathValue = namedtuple("PathValue", ["timestamp", "price", "dic"])
 
 
-class GBM:
+class GBM(PriceProcess):
     def __init__(self, asset: Asset, rv: Union[list, numpy.ndarray], s0: float, stdt: TimeStr,
                  temporal_expression: str, delta: RealNum):
         self.asset = asset.clone()
@@ -55,34 +57,19 @@ class GBM:
     def __repr__(self):
         return str(self.times_series)
 
-    def get_price(self, timestamp: TimeStr) -> PathValue:
-        """获取序列价格"""
+    def get_price(self, timestamp: TimeStr) -> PricePathValue:
         array = self.times_series.get_array()
         index_array, *_ = numpy.where(array[:, 0] <= TimeStamp(timestamp).timestamp())
         if index_array.size > 0:
             index = index_array[-1]
             value = array[:, 1][index]
-            return PathValue(value, {self.asset.name: {"price": value}})
+            return PricePathValue(
+                self.timeline[index],
+                value,
+                {self.asset.name: {"price": value}}
+            )
         else:
             raise Exception(f"{self.timeline[0]} > {timestamp}, index: {index_array}")
-
-    def purchased_to(self, trader: Trader, timestamp: TimeStr, *args, **kwargs):
-        data = {
-            "price": self.get_price(timestamp).value,
-            "trader": trader,
-            "timestamp": timestamp,
-            "position": PositionType.long
-        }
-        self.asset.purchased_to(*args, **data, **kwargs)
-
-    def sold_to(self, trader: Trader, timestamp: TimeStr, *args, **kwargs):
-        data = {
-            "price": self.get_price(timestamp).value,
-            "trader": trader,
-            "timestamp": timestamp,
-            "position": PositionType.long
-        }
-        self.asset.sold_to(*args, **data, **kwargs)
 
 
 if __name__ == "__main__":
