@@ -38,10 +38,12 @@ import numpy
 PricePathValue = namedtuple("PathValue", ["timestamp", "price", "dic"])
 
 
-class GBM(PriceProcess):
-    def __init__(self, asset: Asset, rv: Union[list, numpy.ndarray], s0: float, stdt: TimeStr,
+class RVDecoupledGBM(PriceProcess):
+    """与收益率随机变量分离的GBM"""
+
+    def __init__(self, name: str, rv: Union[list, numpy.ndarray], s0: float, stdt: TimeStr,
                  temporal_expression: str, delta: RealNum):
-        self.asset = asset.clone()
+        self.name = name
         self.timeline = [TimeStamp(stdt)]
         m = [s0]
         for i, r in enumerate(rv):
@@ -66,14 +68,22 @@ class GBM(PriceProcess):
             return PricePathValue(
                 self.timeline[index],
                 value,
-                {self.asset.name: {"price": value}}
+                {self.name: {"price": value}}
             )
         else:
             raise Exception(f"{self.timeline[0]} > {timestamp}, index: {index_array}")
 
 
+class GBM(RVDecoupledGBM):
+    """标准GBM价格过程"""
+
+    def __init__(self, name: str, s0: float, mu: float, sigma: float, len: int, stdt: TimeStr, temporal_expression: str,
+                 delta: RealNum):
+        rv = NormalDistribution(mu, sigma).rvf(len - 1)
+        super().__init__(name, rv, s0, stdt, temporal_expression, delta)
+
+
 if __name__ == "__main__":
     rv = NormalDistribution(0, 0.015).rvf(365)
     s = Spot("10001", 100)
-    print(GBM(s, rv, 100, "2024-1-1", "day", 1).timeline)
-
+    print(RVDecoupledGBM(s.name, rv, 100, "2024-1-1", "day", 1).timeline)

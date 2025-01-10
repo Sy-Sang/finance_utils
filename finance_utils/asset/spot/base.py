@@ -192,7 +192,7 @@ class Spot(Asset):
                 timestamp: TimeStr, *args, **kwargs):
         if self.name in trader.position:
             in_position_quantity = trader.position[self.name].in_position_quantity(
-                TimeStamp(timestamp).get_date() - self.trade_delta
+                TimeStamp(timestamp).get_date_with_last_sec() - self.trade_delta
             )
             if quantity is None:
                 available_quantity = in_position_quantity

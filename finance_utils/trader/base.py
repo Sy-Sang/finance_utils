@@ -47,6 +47,10 @@ class TradeBook(ABC):
         """克隆"""
         return copy.deepcopy(self)
 
+    def clear(self):
+        """清空book"""
+        self.book: list[TradeBookUnit] = []
+
     def sort(self):
         """对订单记录进行排序"""
         time_array = numpy.array([i.timestamp.timestamp() for i in self.book])
@@ -110,6 +114,9 @@ class Trader:
 
     def __repr__(self):
         return str([self.investment_flow, self.capital, self.position])
+
+    def clear(self):
+        self.position: dict[str, TradeBook] = {}
 
     def new_investment(self, investment: float, timestamp: TimeStr):
         """增加资金"""

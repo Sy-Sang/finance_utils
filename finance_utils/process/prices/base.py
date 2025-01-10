@@ -20,6 +20,8 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 
 # 项目模块
+from finance_utils.trader.base import Trader
+from finance_utils.asset.base import Asset
 
 # 外部模块
 import numpy
@@ -37,6 +39,15 @@ class PriceProcess:
     def get_price(self, *args, **kwargs):
         """获取价格"""
         pass
+
+
+class PriceProcessGroup:
+    def __init__(self, pp: PriceProcess, ba: Asset, bt: Trader, num: int):
+        plist = []
+        alist = []
+        tlist = []
+        for i in range(num):
+            pass
 
 
 if __name__ == "__main__":
