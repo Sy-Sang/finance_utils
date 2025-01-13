@@ -154,6 +154,14 @@ class Spot(Asset):
     def __repr__(self):
         return str(self.constructor)
 
+    def clone(self, new_name: str = None):
+        constructor = copy.deepcopy(self.constructor)
+        if new_name is None:
+            pass
+        else:
+            constructor["name"] = new_name
+        return type(self)(**constructor)
+
     def to_spot_trade_book(self, book: TradeBook) -> SpotTradeBook:
         """转换为spotbook"""
         spot_book = SpotTradeBook(self)

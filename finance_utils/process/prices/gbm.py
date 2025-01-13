@@ -28,14 +28,13 @@ from finance_utils.asset.base import *
 from finance_utils.asset.spot.base import Spot
 from finance_utils.trader.base import Trader
 
-from finance_utils.process.prices.base import PriceProcess
+from finance_utils.process.prices.base import PriceProcess, MultiPathing, PricePathValue
 
 # 外部模块
 import numpy
 
-# 代码块
 
-PricePathValue = namedtuple("PathValue", ["timestamp", "price", "dic"])
+# 代码块
 
 
 class RVDecoupledGBM(PriceProcess):
@@ -55,11 +54,19 @@ class RVDecoupledGBM(PriceProcess):
             )
         self.yield_rate_list = copy.deepcopy(rv)
         self.times_series = TimeSeries(timestamp=self.timeline, price=m)
+        self.constructor = {
+            "name": name,
+            "rv": self.yield_rate_list,
+            "s0": s0,
+            "stdt": stdt,
+            "temporal_expression": temporal_expression,
+            "delta": delta
+        }
 
     def __repr__(self):
         return str(self.times_series)
 
-    def get_price(self, timestamp: TimeStr) -> PricePathValue:
+    def get_price(self, timestamp: TimeStr):
         array = self.times_series.get_array()
         index_array, *_ = numpy.where(array[:, 0] <= TimeStamp(timestamp).timestamp())
         if index_array.size > 0:
@@ -73,6 +80,21 @@ class RVDecoupledGBM(PriceProcess):
         else:
             raise Exception(f"{self.timeline[0]} > {timestamp}, index: {index_array}")
 
+    def multi_pathing(self, base_trader: Trader, base_asset: Asset, rv_list: list):
+        path_list = []
+        trader_list = []
+        for i, rv in enumerate(rv_list):
+            constructor = self.constructor
+            # constructor["name"] = f"{base_asset.name}_copy_{i}"
+            constructor["rv"] = rv
+            path_list.append(
+                type(self)(**constructor)
+            )
+            trader_list.append(
+                base_trader.clone(f"{base_trader.name}_copy_{i}")
+            )
+        return MultiPathing(copy.deepcopy(self.timeline), path_list, trader_list)
+
 
 class GBM(RVDecoupledGBM):
     """标准GBM价格过程"""
@@ -81,6 +103,30 @@ class GBM(RVDecoupledGBM):
                  delta: RealNum):
         rv = NormalDistribution(mu, sigma).rvf(len - 1)
         super().__init__(name, rv, s0, stdt, temporal_expression, delta)
+        self.constructor = {
+            "name": name,
+            "s0": s0,
+            "mu": mu,
+            "sigma": sigma,
+            "len": len,
+            "stdt": stdt,
+            "temporal_expression": temporal_expression,
+            "delta": delta
+        }
+
+    def multi_pathing(self, base_trader: Trader, base_asset: Asset, num: int):
+        path_list = []
+        trader_list = []
+        for i in range(num):
+            constructor = self.constructor
+            # constructor["name"] = f"{base_asset.name}_copy_{i}"
+            path_list.append(
+                type(self)(**constructor)
+            )
+            trader_list.append(
+                base_trader.clone(f"{base_trader.name}_copy_{i}")
+            )
+        return MultiPathing(copy.deepcopy(self.timeline), path_list, trader_list)
 
 
 if __name__ == "__main__":

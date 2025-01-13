@@ -58,7 +58,7 @@ class Asset(ABC):
         self.lot_size = float(lot_size)
         self.trade_delta = trade_delta
 
-    def clone(self) -> Self:
+    def clone(self, *args, **kwargs) -> Self:
         """克隆"""
         return copy.deepcopy(self)
 

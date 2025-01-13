@@ -107,13 +107,28 @@ class TradeBook(ABC):
 class Trader:
     """交易员"""
 
-    def __init__(self, investment: float, initial_timestamp: TimeStr):
+    def __init__(self, name: str, investment: float, initial_timestamp: TimeStr):
+        self.name = name
         self.investment_flow: list[InvestmentRec] = [InvestmentRec(TimeStamp(initial_timestamp), investment)]
         self.capital = investment
         self.position: dict[str, TradeBook] = {}
+        self.constructor = {
+            "name": name,
+            "investment": investment,
+            "initial_timestamp": initial_timestamp
+        }
 
     def __repr__(self):
         return str([self.investment_flow, self.capital, self.position])
+
+    def clone(self, new_name: str = None):
+        """拷贝新trader"""
+        constructor = copy.deepcopy(self.constructor)
+        if new_name is None:
+            pass
+        else:
+            constructor["name"] = new_name
+        return type(self)(**self.constructor)
 
     def clear(self):
         self.position: dict[str, TradeBook] = {}

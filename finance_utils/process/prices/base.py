@@ -15,7 +15,7 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Union, Self
+from typing import Union, Self, List
 from collections import namedtuple
 from abc import ABC, abstractmethod
 
@@ -26,28 +26,40 @@ from finance_utils.asset.base import Asset
 # 外部模块
 import numpy
 
-
 # 代码块
 
+PricePathValue = namedtuple("PathValue", ["timestamp", "price", "dic"])
+
+
 class PriceProcess:
+    """价格过程"""
 
     @abstractmethod
     def __repr__(self):
         pass
 
     @abstractmethod
-    def get_price(self, *args, **kwargs):
+    def get_price(self, *args, **kwargs) -> PricePathValue:
         """获取价格"""
         pass
 
+    @abstractmethod
+    def multi_pathing(self, *args, **kwargs):
+        """多条路径"""
+        pass
 
-class PriceProcessGroup:
-    def __init__(self, pp: PriceProcess, ba: Asset, bt: Trader, num: int):
-        plist = []
-        alist = []
-        tlist = []
-        for i in range(num):
-            pass
+
+class MultiPathing:
+    """多条路径"""
+
+    def __init__(self, timeline: List, processes: List[PriceProcess], traders: List[Trader]):
+        self.timeline = timeline
+        self.processes = processes
+        self.trades = traders
+        self.size = (
+            len(self.timeline),
+            len(self.processes)
+        )
 
 
 if __name__ == "__main__":
