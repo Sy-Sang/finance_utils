@@ -48,6 +48,11 @@ class PriceProcess:
         """多条路径"""
         pass
 
+    @classmethod
+    def sharp(cls, yield_list, risk_free_rate: float):
+        """夏普比率"""
+        return (yield_list[-1] - risk_free_rate) / numpy.std(yield_list, ddof=1)
+
 
 class MultiPathing:
     """多条路径"""
@@ -60,6 +65,25 @@ class MultiPathing:
             len(self.timeline),
             len(self.processes)
         )
+        self.constructor = {
+            "timeline": self.timeline,
+            "processes": self.processes,
+            "traders": self.trades
+        }
+
+    def clone(self):
+        return type(self)(**self.constructor)
+
+    def clone_with_new_trader(self, base_trader: Trader):
+        """变更交易员"""
+        trader_list = []
+        for i in range(self.size[1]):
+            trader_list.append(
+                base_trader.clone(f"{base_trader.name}_copy_{i}")
+            )
+        constructor = copy.deepcopy(self.constructor)
+        constructor["traders"] = trader_list
+        return type(self)(**constructor)
 
 
 if __name__ == "__main__":

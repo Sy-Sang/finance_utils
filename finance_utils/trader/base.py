@@ -89,6 +89,11 @@ class TradeBook(ABC):
         pass
 
     @abstractmethod
+    def holding_cost(self, *args, **kwargs) -> float:
+        """持仓成本"""
+        pass
+
+    @abstractmethod
     def value(self, *args, **kwargs) -> float:
         """持仓价值"""
         pass
@@ -119,7 +124,14 @@ class Trader:
         }
 
     def __repr__(self):
-        return str([self.investment_flow, self.capital, self.position])
+        return str([self.name, self.capital, self.position.keys()])
+
+    def in_position(self, name: str):
+        """是否在仓位中"""
+        if name in self.position.keys():
+            return self.position[name].in_position_quantity()
+        else:
+            return False
 
     def clone(self, new_name: str = None):
         """拷贝新trader"""

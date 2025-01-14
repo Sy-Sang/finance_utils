@@ -123,16 +123,40 @@ class SpotTradeBook(TradeBook):
         cost = self.holding_cost(*args)
         return (x - cost) * self.in_position_quantity(*args)
 
-    def simplify(self):
-        shares = self.in_position_quantity()
+    def simplify(self, timestamp: TimeStr):
         stdt, eddt = self.timestamp_domain()
-        if shares > 0:
-            cost = self.holding_cost()
-            self.book = [SpotTradeBookUnit(stdt, cost, shares, PositionType.long)]
-        elif shares < 0:
-            raise Exception(f"{shares} < 0")
+        if self.asset.trade_delta[1] != 0:
+            unsellable_timestamp = [
+                TimeStamp(timestamp).get_date() - self.asset.trade_delta,
+                TimeStamp(timestamp).get_date_with_last_sec() - self.asset.trade_delta
+            ]
+            unsellable_position = self.in_position_quantity(*unsellable_timestamp)
+            unsellable_cost = self.holding_cost(*unsellable_timestamp)
+            unsellable_unit = SpotTradeBookUnit(unsellable_timestamp[0], unsellable_cost, unsellable_position,
+                                                PositionType.long)
+            sellable_timestamp = unsellable_timestamp[0] - ["sec", 1]
+            sellable_position = self.in_position_quantity(sellable_timestamp)
+            sellable_cost = self.holding_cost(sellable_timestamp)
+            sellable_unit = SpotTradeBookUnit(stdt, sellable_cost, sellable_position, PositionType.long)
+            self.book = [
+                sellable_unit,
+                unsellable_unit
+            ]
         else:
-            self.book = [SpotTradeBookUnit(stdt, 0, shares, PositionType.long)]
+            sellable_unit = SpotTradeBookUnit(stdt, self.holding_cost(), self.in_position_quantity(), PositionType.long)
+            self.book = [
+                sellable_unit
+            ]
+
+        # shares = self.in_position_quantity()
+        # stdt, eddt = self.timestamp_domain()
+        # if shares > 0:
+        #     cost = self.holding_cost()
+        #     self.book = [SpotTradeBookUnit(timestamp, cost, shares, PositionType.long)]
+        # elif shares < 0:
+        #     raise Exception(f"{shares} < 0")
+        # else:
+        #     self.book = [SpotTradeBookUnit(timestamp, 0, shares, PositionType.long)]
 
 
 class Spot(Asset):
@@ -184,14 +208,11 @@ class Spot(Asset):
             if self.name in trader.position:
                 book = self.to_spot_trade_book(trader.position[self.name])
                 book.append(timestamp, price, available_quantity, PositionType.long)
-                # trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
                 trader.position[self.name] = book.clone()
             else:
                 book = SpotTradeBook(self)
                 book.append(timestamp, price, available_quantity, PositionType.long)
                 trader.position[self.name] = book.clone()
-                # trader.position[self.name] = SpotTradeBook(self)
-                # trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
             return available_quantity
         else:
             return 0

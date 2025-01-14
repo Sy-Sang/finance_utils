@@ -119,7 +119,6 @@ class GBM(RVDecoupledGBM):
         trader_list = []
         for i in range(num):
             constructor = self.constructor
-            # constructor["name"] = f"{base_asset.name}_copy_{i}"
             path_list.append(
                 type(self)(**constructor)
             )

@@ -19,6 +19,9 @@ from typing import Union, Self
 from collections import namedtuple
 
 # 项目模块
+from finance_utils.asset.spot.base import Spot
+from finance_utils.trader.base import Trader
+from finance_utils.process.prices.gbm import RVDecoupledGBM, GBM
 
 # 外部模块
 import numpy
