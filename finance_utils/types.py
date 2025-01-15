@@ -15,9 +15,8 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Union, Self
+from typing import Union, Self, TypeAlias
 from collections import namedtuple
-from abc import ABC, abstractmethod
 
 # 项目模块
 from easy_datetime.timestamp import TimeStamp
@@ -26,6 +25,8 @@ from easy_datetime.timestamp import TimeStamp
 import numpy
 
 # 代码块
+RealNum: TypeAlias = Union[int, float]
+TimeStr: TypeAlias = Union[TimeStamp, str]
 
 
 if __name__ == "__main__":

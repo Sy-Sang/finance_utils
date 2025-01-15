@@ -20,6 +20,9 @@ from collections import namedtuple
 from enum import Enum
 
 # 项目模块
+from finance_utils.types import *
+from finance_utils.namedtuples import *
+
 from finance_utils.asset.base import *
 from finance_utils.trader.base import TradeBook, TradeBookUnit, Trader
 
@@ -37,6 +40,11 @@ class SpotTradeBookUnit(TradeBookUnit):
         self.price = price
         self.shares = float(shares)
         self.position = position
+        self.tag = None
+
+    def set_tag(self, new_tag: Any = None):
+        self.tag = new_tag
+        return self
 
     def __repr__(self):
         return str([self.timestamp, self.price, self.shares, self.position])
@@ -113,7 +121,39 @@ class SpotTradeBook(TradeBook):
         elif quantity < 0:
             raise Exception(f"{quantity} < 0")
         else:
-            return numpy.nan
+            return 0
+
+    @classmethod
+    def cls_in_position_quantity(cls, position: list[SpotTradeBookUnit]) -> RealNum:
+        """持仓量"""
+        long_sum = sum([
+            i.shares for i in position if i.position == PositionType.long
+        ])
+        short_sum = sum([
+            i.shares for i in position if i.position == PositionType.short
+        ])
+        return long_sum - short_sum
+
+    @classmethod
+    def cls_holding_cost(cls, position: list[SpotTradeBookUnit]) -> RealNum:
+        """持仓成本"""
+        long_list = [
+            [i.price, i.shares] for i in position if i.position == PositionType.long
+        ]
+        short_list = [
+            [i.price, i.shares] for i in position if i.position == PositionType.short
+        ]
+
+        long_array = numpy.array(long_list).astype(float) if long_list else numpy.array([[0, 0]])
+        short_book = numpy.array(short_list).astype(float) if short_list else numpy.array([[0, 0]])
+        amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
+        quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
+        if quantity > 0:
+            return amount / quantity
+        elif quantity < 0:
+            raise Exception(f"{quantity} < 0")
+        else:
+            return 0
 
     def value(self, price: float, *args):
         return self.in_position_quantity(*args) * price
@@ -126,37 +166,23 @@ class SpotTradeBook(TradeBook):
     def simplify(self, timestamp: TimeStr):
         stdt, eddt = self.timestamp_domain()
         if self.asset.trade_delta[1] != 0:
-            unsellable_timestamp = [
-                TimeStamp(timestamp).get_date() - self.asset.trade_delta,
-                TimeStamp(timestamp).get_date_with_last_sec() - self.asset.trade_delta
-            ]
-            unsellable_position = self.in_position_quantity(*unsellable_timestamp)
-            unsellable_cost = self.holding_cost(*unsellable_timestamp)
-            unsellable_unit = SpotTradeBookUnit(unsellable_timestamp[0], unsellable_cost, unsellable_position,
-                                                PositionType.long)
-            sellable_timestamp = unsellable_timestamp[0] - ["sec", 1]
-            sellable_position = self.in_position_quantity(sellable_timestamp)
-            sellable_cost = self.holding_cost(sellable_timestamp)
-            sellable_unit = SpotTradeBookUnit(stdt, sellable_cost, sellable_position, PositionType.long)
-            self.book = [
-                sellable_unit,
-                unsellable_unit
-            ]
+            unsellable_timestamp = Asset.untradable(timestamp, self.asset.trade_delta)
+            unsellable_trades = []
+            other_trades = []
+            for i in self.book:
+                if i.timestamp < unsellable_timestamp or i.position == PositionType.short:
+                    other_trades.append(i)
+                else:
+                    unsellable_trades.append(i)
+            self.book = [SpotTradeBookUnit(
+                stdt, self.cls_holding_cost(other_trades), self.cls_in_position_quantity(other_trades),
+                PositionType.long
+            )] + unsellable_trades
         else:
             sellable_unit = SpotTradeBookUnit(stdt, self.holding_cost(), self.in_position_quantity(), PositionType.long)
             self.book = [
                 sellable_unit
             ]
-
-        # shares = self.in_position_quantity()
-        # stdt, eddt = self.timestamp_domain()
-        # if shares > 0:
-        #     cost = self.holding_cost()
-        #     self.book = [SpotTradeBookUnit(timestamp, cost, shares, PositionType.long)]
-        # elif shares < 0:
-        #     raise Exception(f"{shares} < 0")
-        # else:
-        #     self.book = [SpotTradeBookUnit(timestamp, 0, shares, PositionType.long)]
 
 
 class Spot(Asset):
@@ -166,7 +192,7 @@ class Spot(Asset):
             self,
             name,
             lot_size: RealNum = None,
-            trade_delta: Union[list, tuple] = ("day", 0)
+            trade_delta: TradeDelta = TradeDelta("day", 0)
     ):
         super().__init__(name, lot_size, trade_delta)
         self.constructor = {
@@ -220,9 +246,13 @@ class Spot(Asset):
     def sold_to(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
                 timestamp: TimeStr, *args, **kwargs):
         if self.name in trader.position:
-            in_position_quantity = trader.position[self.name].in_position_quantity(
-                TimeStamp(timestamp).get_date_with_last_sec() - self.trade_delta
-            )
+            unsoldable_timestamp = Asset.untradable(timestamp, self.trade_delta)
+            book = []
+            for i in trader.position[self.name].book:
+                i: SpotTradeBookUnit
+                if i.timestamp < unsoldable_timestamp or i.position == PositionType.short:
+                    book.append(i)
+            in_position_quantity = SpotTradeBook.cls_in_position_quantity(book)
             if quantity is None:
                 available_quantity = in_position_quantity
             else:
@@ -253,12 +283,23 @@ class Spot(Asset):
 
 
 if __name__ == "__main__":
-    test_trader = Trader(100000)
-    s = Spot("10001", 100)
+    test_trader = Trader("trader", 10000 * 100, "2020-1-1")
+    s = Spot("10001", 100, TradeDelta("day", 1))
     # s.trade().purchase(trader, 100, None, )
-    s.percentage_purchase(test_trader, 101, 0.5, "2024-10-1")
-    s.percentage_sell(test_trader, 102, 0.5, "2024-10-2")
-    s.percentage_sell(test_trader, 103, 0.5, "2024-10-3")
-    s.percentage_sell(test_trader, 104, 1, "2024-10-3")
-    print(test_trader)
-    print(test_trader.net_worth_rate(**{"10001": {"price": 100}}))
+    s.purchased_to(test_trader, 101, 20000, "2024-10-1")
+    s.purchased_to(test_trader, 101, 20000, "2024-10-1")
+    s.purchased_to(test_trader, 101, 20000, "2024-10-1")
+    s.purchased_to(test_trader, 101, 20000, "2024-10-2")
+    s.purchased_to(test_trader, 101, 20000, "2024-10-2 23:30")
+    s.sold_to(test_trader, 101, None, "2024-10-2 23:31")
+    s.sold_to(test_trader, 101, None, "2024-10-3 23:31")
+    # test_trader.position_simplify("2024-10-2 23:59")
+    print(test_trader.position[s.name])
+    test_trader.position_simplify("2024-10-2 23:59")
+    print(test_trader.position[s.name])
+
+    # s.percentage_sell(test_trader, 102, 0.5, "2024-10-2")
+    # s.percentage_sell(test_trader, 103, 0.5, "2024-10-3")
+    # s.percentage_sell(test_trader, 104, 1, "2024-10-3")
+    # print(test_trader)
+    # print(test_trader.net_worth_rate(**{"10001": {"price": 100}}))

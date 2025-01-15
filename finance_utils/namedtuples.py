@@ -25,6 +25,13 @@ import numpy
 
 # 代码块
 
+TimestampDomain = namedtuple("TimestampDomain", ["stdt", "eddt"])
+
+TradeDelta = namedtuple("TradeDelta", ["temporal", "delta"])
+
+PricePathValue = namedtuple("PathValue", ["timestamp", "price", "dic"])
+
+InvestmentRec = namedtuple("InvestmentRec", ["timestamp", "investment"])
 
 if __name__ == "__main__":
     pass

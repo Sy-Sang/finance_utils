@@ -20,15 +20,16 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 
 # 项目模块
+from finance_utils.types import *
+from finance_utils.namedtuples import *
 from finance_utils.trader.base import Trader
 from finance_utils.asset.base import Asset
 
 # 外部模块
 import numpy
 
-# 代码块
 
-PricePathValue = namedtuple("PathValue", ["timestamp", "price", "dic"])
+# 代码块
 
 
 class PriceProcess:

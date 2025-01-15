@@ -24,6 +24,7 @@ from data_utils.stochastic_utils.distributions.basic_distributions import Normal
 from data_utils.serial_utils.time_series import TimeSeries
 from easy_datetime.timestamp import TimeStamp
 
+from finance_utils.types import *
 from finance_utils.asset.base import *
 from finance_utils.asset.spot.base import Spot
 from finance_utils.trader.base import Trader

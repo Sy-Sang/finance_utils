@@ -15,7 +15,7 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Any, Union, Self, TypeAlias
+from typing import Any, Union, Self
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -23,13 +23,14 @@ from functools import wraps
 
 # 项目模块
 from easy_datetime.timestamp import TimeStamp
+from finance_utils.types import *
+from finance_utils.namedtuples import *
 
 # 外部模块
 import numpy
 
+
 # 代码块
-RealNum: TypeAlias = Union[int, float]
-TimeStr: TypeAlias = Union[TimeStamp, str]
 
 
 class PositionType(Enum):
@@ -53,7 +54,7 @@ class OptionType(Enum):
 class Asset(ABC):
     """金融资产"""
 
-    def __init__(self, name: Any, lot_size: RealNum, trade_delta, *args, **kwargs):
+    def __init__(self, name: Any, lot_size: RealNum, trade_delta: TradeDelta, *args, **kwargs):
         self.name = str(name)
         self.lot_size = float(lot_size)
         self.trade_delta = trade_delta
@@ -84,6 +85,17 @@ class Asset(ABC):
         """卖出"""
         pass
 
+    @classmethod
+    def untradable(cls, timestamp: TimeStr, trade_delta: TradeDelta):
+        """在timestamp时刻无法交易的时间段"""
+        ts = TimeStamp(timestamp)
+        for i in range(trade_delta.delta):
+            ts = ts.accurate_to(trade_delta.temporal) - [trade_delta.temporal, i]
+        return ts
+
 
 if __name__ == "__main__":
-    pass
+    print(TimeStamp.now())
+    print(
+        Asset.untradable(TimeStamp.now(), TradeDelta("min", 1))
+    )

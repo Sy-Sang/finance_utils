@@ -20,14 +20,15 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 
 # 项目模块
+from finance_utils.types import *
+from finance_utils.namedtuples import *
 from finance_utils.asset.base import *
 
 # 外部模块
 import numpy
 
-# 代码块
 
-InvestmentRec = namedtuple("InvestmentRec", ["timestamp", "investment"])
+# 代码块
 
 
 class TradeBookUnit(ABC):
@@ -69,9 +70,9 @@ class TradeBook(ABC):
         """添加交易记录"""
         pass
 
-    def timestamp_domain(self) -> tuple[TimeStamp, TimeStamp]:
+    def timestamp_domain(self) -> TimestampDomain:
         """订单表时间区间"""
-        return self.book[0].timestamp, self.book[-1].timestamp
+        return TimestampDomain(self.book[0].timestamp, self.book[-1].timestamp)
 
     @abstractmethod
     def long_quantity(self, *args, **kwargs) -> float:
@@ -132,6 +133,10 @@ class Trader:
             return self.position[name].in_position_quantity()
         else:
             return False
+
+    def position_simplify(self, timestamp: TimeStr, *args, **kwargs):
+        for k in self.position.keys():
+            self.position[k].simplify(timestamp, *args, **kwargs)
 
     def clone(self, new_name: str = None):
         """拷贝新trader"""
