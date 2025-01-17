@@ -23,7 +23,7 @@ from functools import wraps
 
 # 项目模块
 from easy_datetime.timestamp import TimeStamp
-from finance_utils.types import *
+from finance_utils.uniontypes import *
 from finance_utils.namedtuples import *
 
 # 外部模块
@@ -54,7 +54,7 @@ class OptionType(Enum):
 class Asset(ABC):
     """金融资产"""
 
-    def __init__(self, name: Any, lot_size: RealNum, trade_delta: TradeDelta, *args, **kwargs):
+    def __init__(self, name: Any, lot_size: Rational, trade_delta: TradeDelta, *args, **kwargs):
         self.name = str(name)
         self.lot_size = float(lot_size)
         self.trade_delta = trade_delta
@@ -67,7 +67,7 @@ class Asset(ABC):
     def __repr__(self):
         pass
 
-    def max_purchase_quantity(self, price: RealNum, capital: RealNum, *args, **kwargs):
+    def max_purchase_quantity(self, price: Rational, capital: Rational, *args, **kwargs):
         """最大购买量"""
         if self.lot_size is None:
             shares = capital / price

@@ -20,7 +20,7 @@ from collections import namedtuple
 from enum import Enum
 
 # 项目模块
-from finance_utils.types import *
+from finance_utils.uniontypes import *
 from finance_utils.namedtuples import *
 
 from finance_utils.asset.base import *
@@ -35,7 +35,7 @@ import numpy
 class SpotTradeBookUnit(TradeBookUnit):
     """现货交易记录单元"""
 
-    def __init__(self, timestamp: TimeStr, price: float, shares: RealNum, position: PositionType):
+    def __init__(self, timestamp: TimeStr, price: float, shares: Rational, position: PositionType):
         super().__init__(timestamp)
         self.price = price
         self.shares = float(shares)
@@ -43,6 +43,7 @@ class SpotTradeBookUnit(TradeBookUnit):
         self.tag = None
 
     def set_tag(self, new_tag: Any = None):
+        """设置标签"""
         self.tag = new_tag
         return self
 
@@ -55,7 +56,7 @@ class SpotTradeBook(TradeBook):
 
     def __init__(self, asset: Asset):
         super().__init__()
-        self.asset = asset.clone()
+        self.asset = asset
         self.book: list[SpotTradeBookUnit]
 
     def __repr__(self):
@@ -67,11 +68,28 @@ class SpotTradeBook(TradeBook):
         else:
             return False
 
-    def append(self, timestamp: TimeStr, price: RealNum, shares: RealNum, position: PositionType):
+    def append(self, timestamp: TimeStr, price: Rational, shares: Rational, position: PositionType):
+
+        if self.book:
+            last_timestamp = self.book[-1].timestamp
+            if timestamp is None:
+                ts = last_timestamp + ["microsec", 1]
+            else:
+                ts = TimeStamp(timestamp)
+                if ts < last_timestamp:
+                    raise Exception(f"Time sequence error:{ts} < {last_timestamp}")
+                elif ts == last_timestamp:
+                    ts += ["microsec", 1]
+                else:
+                    pass
+        else:
+            if timestamp is None:
+                ts = TimeStamp.now()
+            else:
+                ts = TimeStamp(timestamp)
         self.book.append(
-            SpotTradeBookUnit(TimeStamp(timestamp), float(price), float(shares), position)
+            SpotTradeBookUnit(ts, float(price), float(shares), position)
         )
-        self.sort()
 
     def interval_book(self, stdt: TimeStr, eddt: TimeStr) -> list[SpotTradeBookUnit]:
         """按时间区间的交易记录"""
@@ -124,7 +142,7 @@ class SpotTradeBook(TradeBook):
             return 0
 
     @classmethod
-    def cls_in_position_quantity(cls, position: list[SpotTradeBookUnit]) -> RealNum:
+    def cls_in_position_quantity(cls, position: list[SpotTradeBookUnit]) -> Rational:
         """持仓量"""
         long_sum = sum([
             i.shares for i in position if i.position == PositionType.long
@@ -135,7 +153,7 @@ class SpotTradeBook(TradeBook):
         return long_sum - short_sum
 
     @classmethod
-    def cls_holding_cost(cls, position: list[SpotTradeBookUnit]) -> RealNum:
+    def cls_holding_cost(cls, position: list[SpotTradeBookUnit]) -> Rational:
         """持仓成本"""
         long_list = [
             [i.price, i.shares] for i in position if i.position == PositionType.long
@@ -164,9 +182,14 @@ class SpotTradeBook(TradeBook):
         return (x - cost) * self.in_position_quantity(*args)
 
     def simplify(self, timestamp: TimeStr):
+        if timestamp is None:
+            ts = self.next_timestamp()
+        else:
+            ts = TimeStamp(timestamp)
+
         stdt, eddt = self.timestamp_domain()
         if self.asset.trade_delta[1] != 0:
-            unsellable_timestamp = Asset.untradable(timestamp, self.asset.trade_delta)
+            unsellable_timestamp = Asset.untradable(ts, self.asset.trade_delta)
             unsellable_trades = []
             other_trades = []
             for i in self.book:
@@ -191,7 +214,7 @@ class Spot(Asset):
     def __init__(
             self,
             name,
-            lot_size: RealNum = None,
+            lot_size: Rational = None,
             trade_delta: TradeDelta = TradeDelta("day", 0)
     ):
         super().__init__(name, lot_size, trade_delta)
@@ -225,32 +248,33 @@ class Spot(Asset):
         """损益"""
         return (x - initial_price) * position.value
 
-    def purchased_to(self, trader: Trader, price: float, capital: Union[RealNum, None], timestamp: TimeStr,
+    def purchased_to(self, trader: Trader, price: float, capital: Union[Rational, None], timestamp: TimeStr,
                      *args, **kwargs):
         available_capital = trader.capital if capital is None else min(trader.capital, capital)
         available_quantity = self.max_purchase_quantity(price, available_capital)
         if available_quantity > 0:
             trader.capital -= price * available_quantity
             if self.name in trader.position:
-                book = self.to_spot_trade_book(trader.position[self.name])
-                book.append(timestamp, price, available_quantity, PositionType.long)
-                trader.position[self.name] = book.clone()
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
             else:
-                book = SpotTradeBook(self)
-                book.append(timestamp, price, available_quantity, PositionType.long)
-                trader.position[self.name] = book.clone()
+                trader.position[self.name] = SpotTradeBook(self)
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
             return available_quantity
         else:
             return 0
 
-    def sold_to(self, trader: Trader, price: RealNum, quantity: Union[RealNum, None],
+    def sold_to(self, trader: Trader, price: Rational, quantity: Union[Rational, None],
                 timestamp: TimeStr, *args, **kwargs):
         if self.name in trader.position:
-            unsoldable_timestamp = Asset.untradable(timestamp, self.trade_delta)
+            if timestamp is None:
+                ts = trader.position[self.name].next_timestamp()
+            else:
+                ts = TimeStamp(timestamp)
+            untradable_timestamp = Asset.untradable(ts, self.trade_delta)
             book = []
             for i in trader.position[self.name].book:
                 i: SpotTradeBookUnit
-                if i.timestamp < unsoldable_timestamp or i.position == PositionType.short:
+                if i.timestamp < untradable_timestamp or i.position == PositionType.short:
                     book.append(i)
             in_position_quantity = SpotTradeBook.cls_in_position_quantity(book)
             if quantity is None:
@@ -259,7 +283,7 @@ class Spot(Asset):
                 available_quantity = min(quantity, in_position_quantity)
             if available_quantity > 0:
                 trader.capital += price * available_quantity
-                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.short)
+                trader.position[self.name].append(ts, price, available_quantity, PositionType.short)
                 return available_quantity
             else:
                 return 0
@@ -286,20 +310,15 @@ if __name__ == "__main__":
     test_trader = Trader("trader", 10000 * 100, "2020-1-1")
     s = Spot("10001", 100, TradeDelta("day", 1))
     # s.trade().purchase(trader, 100, None, )
-    s.purchased_to(test_trader, 101, 20000, "2024-10-1")
-    s.purchased_to(test_trader, 101, 20000, "2024-10-1")
-    s.purchased_to(test_trader, 101, 20000, "2024-10-1")
-    s.purchased_to(test_trader, 101, 20000, "2024-10-2")
-    s.purchased_to(test_trader, 101, 20000, "2024-10-2 23:30")
-    s.sold_to(test_trader, 101, None, "2024-10-2 23:31")
-    s.sold_to(test_trader, 101, None, "2024-10-3 23:31")
-    # test_trader.position_simplify("2024-10-2 23:59")
+    s.purchased_to(test_trader, 100, 20000, "2024-10-1")
+    s.purchased_to(test_trader, 100, 20000, None)
+    s.purchased_to(test_trader, 100, 20000, None)
+    s.purchased_to(test_trader, 100, 20000, "2024-10-2")
+    s.purchased_to(test_trader, 100, 20000, None)
+    s.sold_to(test_trader, 100, None, None)
+    print(test_trader.position[s.name].in_position_quantity())
+    test_trader.position_simplify(None)
     print(test_trader.position[s.name])
-    test_trader.position_simplify("2024-10-2 23:59")
+    s.sold_to(test_trader, 100, None, "2024-10-3")
+    test_trader.position_simplify(None)
     print(test_trader.position[s.name])
-
-    # s.percentage_sell(test_trader, 102, 0.5, "2024-10-2")
-    # s.percentage_sell(test_trader, 103, 0.5, "2024-10-3")
-    # s.percentage_sell(test_trader, 104, 1, "2024-10-3")
-    # print(test_trader)
-    # print(test_trader.net_worth_rate(**{"10001": {"price": 100}}))

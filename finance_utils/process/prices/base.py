@@ -20,7 +20,7 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 
 # 项目模块
-from finance_utils.types import *
+from finance_utils.uniontypes import *
 from finance_utils.namedtuples import *
 from finance_utils.trader.base import Trader
 from finance_utils.asset.base import Asset
@@ -34,6 +34,9 @@ import numpy
 
 class PriceProcess:
     """价格过程"""
+
+    def __init__(self, s0, *args, **kwargs):
+        self.s0 = s0
 
     @abstractmethod
     def __repr__(self):
@@ -58,7 +61,7 @@ class PriceProcess:
 class MultiPathing:
     """多条路径"""
 
-    def __init__(self, timeline: List, processes: List[PriceProcess], traders: List[Trader]):
+    def __init__(self, timeline: list[TimeStamp], processes: List[PriceProcess], traders: List[Trader]):
         self.timeline = timeline
         self.processes = processes
         self.trades = traders
@@ -66,6 +69,7 @@ class MultiPathing:
             len(self.timeline),
             len(self.processes)
         )
+        self.length, self.width = self.size
         self.constructor = {
             "timeline": self.timeline,
             "processes": self.processes,
@@ -85,6 +89,10 @@ class MultiPathing:
         constructor = copy.deepcopy(self.constructor)
         constructor["traders"] = trader_list
         return type(self)(**constructor)
+
+    def clear(self):
+        for j in range(self.width):
+            self.trades[j].clear()
 
 
 if __name__ == "__main__":

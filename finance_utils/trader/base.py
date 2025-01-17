@@ -20,7 +20,7 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 
 # 项目模块
-from finance_utils.types import *
+from finance_utils.uniontypes import *
 from finance_utils.namedtuples import *
 from finance_utils.asset.base import *
 
@@ -64,6 +64,13 @@ class TradeBook(ABC):
             for i in sort_index:
                 sorted_book.append(self.book[i])
             self.book = sorted_book
+
+    def next_timestamp(self):
+        """下一个时间戳"""
+        if self.book:
+            return self.book[-1].timestamp + ["microsec", 1]
+        else:
+            return TimeStamp.now()
 
     @abstractmethod
     def append(self, *args, **kwargs):
@@ -126,6 +133,11 @@ class Trader:
 
     def __repr__(self):
         return str([self.name, self.capital, self.position.keys()])
+
+    def clear(self):
+        """重置交易记录"""
+        for k in self.position.keys():
+            self.position[k].clear()
 
     def in_position(self, name: str):
         """是否在仓位中"""

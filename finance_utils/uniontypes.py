@@ -25,9 +25,8 @@ from easy_datetime.timestamp import TimeStamp
 import numpy
 
 # 代码块
-RealNum: TypeAlias = Union[int, float]
-TimeStr: TypeAlias = Union[TimeStamp, str]
-
+Rational: TypeAlias = Union[int, float]
+TimeStr: TypeAlias = Union[TimeStamp, str, None]
 
 if __name__ == "__main__":
     pass

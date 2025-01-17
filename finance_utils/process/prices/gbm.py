@@ -24,7 +24,7 @@ from data_utils.stochastic_utils.distributions.basic_distributions import Normal
 from data_utils.serial_utils.time_series import TimeSeries
 from easy_datetime.timestamp import TimeStamp
 
-from finance_utils.types import *
+from finance_utils.uniontypes import *
 from finance_utils.asset.base import *
 from finance_utils.asset.spot.base import Spot
 from finance_utils.trader.base import Trader
@@ -42,7 +42,8 @@ class RVDecoupledGBM(PriceProcess):
     """与收益率随机变量分离的GBM"""
 
     def __init__(self, name: str, rv: Union[list, numpy.ndarray], s0: float, stdt: TimeStr,
-                 temporal_expression: str, delta: RealNum):
+                 temporal_expression: str, delta: Rational):
+        super().__init__(s0)
         self.name = name
         self.timeline = [TimeStamp(stdt)]
         m = [s0]
@@ -101,7 +102,7 @@ class GBM(RVDecoupledGBM):
     """标准GBM价格过程"""
 
     def __init__(self, name: str, s0: float, mu: float, sigma: float, len: int, stdt: TimeStr, temporal_expression: str,
-                 delta: RealNum):
+                 delta: Rational):
         rv = NormalDistribution(mu, sigma).rvf(len - 1)
         super().__init__(name, rv, s0, stdt, temporal_expression, delta)
         self.constructor = {
