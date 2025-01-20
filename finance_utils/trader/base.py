@@ -136,8 +136,7 @@ class Trader:
 
     def clear(self):
         """重置交易记录"""
-        for k in self.position.keys():
-            self.position[k].clear()
+        self.__init__(**self.constructor)
 
     def in_position(self, name: str):
         """是否在仓位中"""
@@ -158,9 +157,6 @@ class Trader:
         else:
             constructor["name"] = new_name
         return type(self)(**self.constructor)
-
-    def clear(self):
-        self.position: dict[str, TradeBook] = {}
 
     def new_investment(self, investment: float, timestamp: TimeStr):
         """增加资金"""

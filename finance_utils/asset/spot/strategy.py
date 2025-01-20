@@ -30,6 +30,31 @@ import numpy
 
 # 代码块
 
+class MonteCarloResult:
+    """压力测试结果"""
+
+    def __init__(self, yield_list: list, price_list: list):
+        self.yield_slices = numpy.array(yield_list)
+        self.spot_slices = numpy.array(price_list)
+        self.length = len(self.yield_slices)
+        self.width = len(self.yield_slices[0])
+
+    def max_drawdown(self):
+        """回撤"""
+        nt = namedtuple("nt", ["yield_drawdown", "spot_drawdown"])
+        return nt(numpy.min(self.yield_slices, axis=0), numpy.min(self.spot_slices, axis=0))
+
+    def sharp(self, risk_free_rate: float = 1.03):
+        """夏普比率"""
+
+        def f(xlist):
+            return (numpy.mean(xlist, axis=0) - risk_free_rate) / numpy.std(xlist, ddof=1, axis=0)
+
+        nt = namedtuple("nt", ["yield_sharp", "spot_sharp"])
+
+        return nt(f(self.yield_slices), f(self.spot_slices))
+
+
 class SpotCostAveragingPlan:
     """现货定投"""
 
@@ -59,7 +84,7 @@ class SpotCostAveragingPlan:
             yield_list.append(yield_slice)
             price_list.append(price_slice)
 
-        return yield_list, price_list
+        return MonteCarloResult(yield_list, price_list)
 
     def monthly_cap(self, capital: float, days: list[int]):
         """按月度cap"""
@@ -81,7 +106,7 @@ class SpotCostAveragingPlan:
             yield_list.append(yield_slice)
             price_list.append(price_slice)
 
-        return yield_list, price_list
+        return MonteCarloResult(yield_list, price_list)
 
     def price_qualified_cap(self, capital: float, purchase_qualif: float, sell_qualif: float):
         """根据价格有条件触发的cap"""
@@ -94,20 +119,25 @@ class SpotCostAveragingPlan:
             for j in range(self.mp.width):
                 path_data = self.mp.processes[j].get_price(t)
                 price_slice.append(path_data.price / self.s0)
-                cost = self.mp.trades[j].position[self.asset.name].holding_cost()
-                if path_data.price < cost * purchase_qualif:
+
+                if self.mp.trades[j].in_position(self.asset.name) > 0:
+                    cost = self.mp.trades[j].position[self.asset.name].holding_cost()
+                    if path_data.price < cost * purchase_qualif:
+                        self.asset.purchased_to(self.mp.trades[j], path_data.price, capital, t)
+                        self.mp.trades[j].position_simplify(None)
+                    elif path_data.price > cost * sell_qualif:
+                        self.asset.sold_to(self.mp.trades[j], path_data.price, None, t)
+                        self.mp.trades[j].position_simplify(None)
+                    else:
+                        pass
+                else:
                     self.asset.purchased_to(self.mp.trades[j], path_data.price, capital, t)
                     self.mp.trades[j].position_simplify(None)
-                elif path_data.price > cost * sell_qualif:
-                    self.asset.sold_to(self.mp.trades[j], path_data.price, None, t)
-                    self.mp.trades[j].position_simplify(None)
-                else:
-                    pass
                 yield_slice.append(self.mp.trades[j].net_worth_rate(**path_data.dic))
             yield_list.append(yield_slice)
             price_list.append(price_slice)
 
-        return yield_list, price_list
+        return MonteCarloResult(yield_list, price_list)
 
 
 if __name__ == "__main__":
