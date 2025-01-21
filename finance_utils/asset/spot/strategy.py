@@ -41,18 +41,28 @@ class MonteCarloResult:
 
     def max_drawdown(self):
         """回撤"""
-        nt = namedtuple("nt", ["yield_drawdown", "spot_drawdown"])
-        return nt(numpy.min(self.yield_slices, axis=0), numpy.min(self.spot_slices, axis=0))
+        drawdown_tuple = namedtuple("drawdown_tuple", ["yield_drawdown", "spot_drawdown"])
+        return drawdown_tuple(numpy.min(self.yield_slices, axis=0), numpy.min(self.spot_slices, axis=0))
 
-    def sharp(self, risk_free_rate: float = 1.03):
-        """夏普比率"""
+    def mean_sharp(self, risk_free_rate: float = 1.03):
+        """平均收益率夏普比率"""
 
         def f(xlist):
             return (numpy.mean(xlist, axis=0) - risk_free_rate) / numpy.std(xlist, ddof=1, axis=0)
 
-        nt = namedtuple("nt", ["yield_sharp", "spot_sharp"])
+        sharp_tuple = namedtuple("sharp_tuple", ["yield_sharp", "spot_sharp"])
 
-        return nt(f(self.yield_slices), f(self.spot_slices))
+        return sharp_tuple(f(self.yield_slices), f(self.spot_slices))
+
+    def slice_sharp(self, risk_free_rate: float = 1.03, slice_index: int = -1):
+        """切片收益率夏普比率"""
+
+        def f(xlist):
+            return (xlist[slice_index] - risk_free_rate) / numpy.std(xlist, ddof=1, axis=0)
+
+        sharp_tuple = namedtuple("sharp_tuple", ["yield_sharp", "spot_sharp"])
+
+        return sharp_tuple(f(self.yield_slices), f(self.spot_slices))
 
 
 class SpotCostAveragingPlan:

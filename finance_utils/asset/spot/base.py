@@ -18,6 +18,7 @@ import json
 from typing import Union, Self, TypeAlias
 from collections import namedtuple
 from enum import Enum
+import warnings
 
 # 项目模块
 from finance_utils.uniontypes import *
@@ -113,33 +114,58 @@ class SpotTradeBook(TradeBook):
             return self.interval_book(args[0], args[1])
 
     def long_quantity(self, *args) -> float:
-        return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.long])
+        if args:
+            return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.long])
+        else:
+            return sum([i.shares for i in self.book if i.position == PositionType.long])
 
     def short_quantity(self, *args) -> float:
-        return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.short])
+        if args:
+            return sum([i.shares for i in self.get_book_item(*args) if i.position == PositionType.short])
+        else:
+            return sum([i.shares for i in self.book if i.position == PositionType.short])
 
     def in_position_quantity(self, *args):
         return self.long_quantity(*args) - self.short_quantity(*args)
 
     def holding_cost(self, *args) -> float:
         """平均持仓成本"""
-        long_list = [
-            [i.price, i.shares] for i in self.get_book_item(*args) if i.position == PositionType.long
-        ]
-        short_list = [
-            [i.price, i.shares] for i in self.get_book_item(*args) if i.position == PositionType.short
-        ]
-
-        long_array = numpy.array(long_list).astype(float) if long_list else numpy.array([[0, 0]])
-        short_book = numpy.array(short_list).astype(float) if short_list else numpy.array([[0, 0]])
-        amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
-        quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
-        if quantity > 0:
-            return amount / quantity
-        elif quantity < 0:
-            raise Exception(f"{quantity} < 0")
+        if args:
+            book_item = self.get_book_item(*args)
+        else:
+            book_item = self.book
+        long_items = [(i.price, i.shares) for i in book_item if i.position == PositionType.long]
+        short_items = [(i.price, i.shares) for i in book_item if i.position == PositionType.short]
+        long_array = numpy.array(long_items) if long_items else numpy.zeros((1, 2))
+        short_array = numpy.array(short_items) if short_items else numpy.zeros((1, 2))
+        total_amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_array[:, 0] * short_array[:, 1])
+        total_quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_array[:, 1])
+        if total_quantity > 0:
+            return total_amount / total_quantity
+        elif total_quantity < 0:
+            raise Exception(f"total_quantity:{total_quantity} < 0")
         else:
             return 0
+
+    def quantity_and_cost(self, *args):
+        """持仓量与持仓成本"""
+        if args:
+            book_item = self.get_book_item(*args)
+        else:
+            book_item = self.book
+        long_items = [(i.price, i.shares) for i in book_item if i.position == PositionType.long]
+        short_items = [(i.price, i.shares) for i in book_item if i.position == PositionType.short]
+        long_array = numpy.array(long_items) if long_items else numpy.zeros((1, 2))
+        short_array = numpy.array(short_items) if short_items else numpy.zeros((1, 2))
+        total_amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_array[:, 0] * short_array[:, 1])
+        total_quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_array[:, 1])
+        if total_quantity > 0:
+            return total_quantity, total_amount / total_quantity
+        elif total_quantity < 0:
+            warnings.warn(f"quantity: {total_quantity}<0", category=UserWarning)
+            return total_quantity, 0
+        else:
+            return 0, 0
 
     @classmethod
     def cls_in_position_quantity(cls, position: list[SpotTradeBookUnit]) -> Rational:
@@ -162,16 +188,38 @@ class SpotTradeBook(TradeBook):
             [i.price, i.shares] for i in position if i.position == PositionType.short
         ]
 
-        long_array = numpy.array(long_list).astype(float) if long_list else numpy.array([[0, 0]])
-        short_book = numpy.array(short_list).astype(float) if short_list else numpy.array([[0, 0]])
+        long_array = numpy.array(long_list) if long_list else numpy.zeros((1, 2))
+        short_book = numpy.array(short_list) if short_list else numpy.zeros((1, 2))
         amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
         quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
         if quantity > 0:
             return amount / quantity
         elif quantity < 0:
-            raise Exception(f"{quantity} < 0")
+            raise Exception(f"total_quantity: {quantity} < 0")
         else:
             return 0
+
+    @classmethod
+    def cls_quantity_and_cost(cls, position: list[SpotTradeBookUnit]):
+        """获取现货book的量与成本"""
+        long_list = [
+            [i.price, i.shares] for i in position if i.position == PositionType.long
+        ]
+        short_list = [
+            [i.price, i.shares] for i in position if i.position == PositionType.short
+        ]
+
+        long_array = numpy.array(long_list) if long_list else numpy.zeros((1, 2))
+        short_book = numpy.array(short_list) if short_list else numpy.zeros((1, 2))
+        amount = numpy.sum(long_array[:, 0] * long_array[:, 1]) - numpy.sum(short_book[:, 0] * short_book[:, 1])
+        quantity = numpy.sum(long_array[:, 1]) - numpy.sum(short_book[:, 1])
+        if quantity > 0:
+            return quantity, amount / quantity
+        elif quantity < 0:
+            warnings.warn(f"quantity: {quantity}<0", category=UserWarning)
+            return quantity, 0
+        else:
+            return 0, 0
 
     def value(self, price: float, *args):
         return self.in_position_quantity(*args) * price
@@ -197,12 +245,14 @@ class SpotTradeBook(TradeBook):
                     other_trades.append(i)
                 else:
                     unsellable_trades.append(i)
+            holding_quantity, holding_cost = self.cls_quantity_and_cost(other_trades)
             self.book = [SpotTradeBookUnit(
-                stdt, self.cls_holding_cost(other_trades), self.cls_in_position_quantity(other_trades),
+                stdt, holding_cost, holding_quantity,
                 PositionType.long
             )] + unsellable_trades
         else:
-            sellable_unit = SpotTradeBookUnit(stdt, self.holding_cost(), self.in_position_quantity(), PositionType.long)
+            holding_quantity, holding_cost = self.quantity_and_cost()
+            sellable_unit = SpotTradeBookUnit(stdt, holding_cost, holding_quantity, PositionType.long)
             self.book = [
                 sellable_unit
             ]
@@ -307,18 +357,15 @@ class Spot(Asset):
 
 
 if __name__ == "__main__":
+    time0 = TimeStamp.now()
     test_trader = Trader("trader", 10000 * 100, "2020-1-1")
     s = Spot("10001", 100, TradeDelta("day", 1))
-    # s.trade().purchase(trader, 100, None, )
-    s.purchased_to(test_trader, 100, 20000, "2024-10-1")
-    s.purchased_to(test_trader, 100, 20000, None)
-    s.purchased_to(test_trader, 100, 20000, None)
-    s.purchased_to(test_trader, 100, 20000, "2024-10-2")
-    s.purchased_to(test_trader, 100, 20000, None)
-    s.sold_to(test_trader, 100, None, None)
-    print(test_trader.position[s.name].in_position_quantity())
-    test_trader.position_simplify(None)
-    print(test_trader.position[s.name])
-    s.sold_to(test_trader, 100, None, "2024-10-3")
-    test_trader.position_simplify(None)
-    print(test_trader.position[s.name])
+    s.purchased_to(test_trader, 10, 10000, "2023-1-1")
+    for i in range(1000):
+        t = TimeStamp("2024-1-1") + ["day", i]
+        s.purchased_to(test_trader, 10, 10000, t)
+        s.sold_to(test_trader, 11, None, t)
+        test_trader.position_simplify(None)
+        # print(len(test_trader.position[s.name].book))
+        test_trader.position[s.name].holding_cost()
+    print(TimeStamp.now() - time0)

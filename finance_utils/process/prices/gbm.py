@@ -87,7 +87,6 @@ class RVDecoupledGBM(PriceProcess):
         trader_list = []
         for i, rv in enumerate(rv_list):
             constructor = self.constructor
-            # constructor["name"] = f"{base_asset.name}_copy_{i}"
             constructor["rv"] = rv
             path_list.append(
                 type(self)(**constructor)
