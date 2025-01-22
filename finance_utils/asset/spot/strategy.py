@@ -33,9 +33,9 @@ import numpy
 class MonteCarloResult:
     """压力测试结果"""
 
-    def __init__(self, yield_list: list, price_list: list):
-        self.yield_slices = numpy.array(yield_list)
-        self.spot_slices = numpy.array(price_list)
+    def __init__(self, yield_slice_list: list, price_slice_list: list):
+        self.yield_slices = numpy.array(yield_slice_list)
+        self.spot_slices = numpy.array(price_slice_list)
         self.length = len(self.yield_slices)
         self.width = len(self.yield_slices[0])
 
@@ -63,6 +63,10 @@ class MonteCarloResult:
         sharp_tuple = namedtuple("sharp_tuple", ["yield_sharp", "spot_sharp"])
 
         return sharp_tuple(f(self.yield_slices), f(self.spot_slices))
+
+    def slice_quantile_rate(self, risk_free_rate: float = 1.03, slice_index: int = -1):
+        """切片分位数比例"""
+        pass
 
 
 class SpotCostAveragingPlan:

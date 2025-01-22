@@ -46,16 +46,16 @@ class RVDecoupledGBM(PriceProcess):
         super().__init__(s0)
         self.name = name
         self.timeline = [TimeStamp(stdt)]
-        m = [s0]
+        self.price = [s0]
         for i, r in enumerate(rv):
             self.timeline.append(
                 self.timeline[-1] + [temporal_expression, delta]
             )
-            m.append(
-                m[-1] * (1 + r)
+            self.price.append(
+                self.price[-1] * (1 + r)
             )
         self.yield_rate_list = copy.deepcopy(rv)
-        self.times_series = TimeSeries(timestamp=self.timeline, price=m)
+        self.times_series = TimeSeries(timestamp=self.timeline, price=self.price)
         self.constructor = {
             "name": name,
             "rv": self.yield_rate_list,
@@ -69,18 +69,22 @@ class RVDecoupledGBM(PriceProcess):
         return str(self.times_series)
 
     def get_price(self, timestamp: TimeStr):
-        array = self.times_series.get_array()
-        index_array, *_ = numpy.where(array[:, 0] <= TimeStamp(timestamp).timestamp())
-        if index_array.size > 0:
-            index = index_array[-1]
-            value = array[:, 1][index]
+        ts = TimeStamp(timestamp)
+        if ts >= self.timeline[0]:
+            raw_index = numpy.searchsorted(self.times_series.data["timestamp"], ts.timestamp())
+            index = raw_index - 1 if raw_index > 0 else 0
+            value = self.price[index]
             return PricePathValue(
                 self.timeline[index],
                 value,
                 {self.name: {"price": value}}
             )
         else:
-            raise Exception(f"{self.timeline[0]} > {timestamp}, index: {index_array}")
+            return PricePathValue(
+                numpy.nan,
+                numpy.nan,
+                {self.name: {"price": numpy.nan}}
+            )
 
     def multi_pathing(self, base_trader: Trader, base_asset: Asset, rv_list: list):
         path_list = []
