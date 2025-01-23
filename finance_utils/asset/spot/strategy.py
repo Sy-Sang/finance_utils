@@ -15,7 +15,7 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Union, Self
+from typing import Union, Self, Type
 from collections import namedtuple
 
 # 项目模块
@@ -23,7 +23,7 @@ from finance_utils.asset.spot.base import Spot
 from finance_utils.trader.base import Trader
 from finance_utils.process.prices.base import MultiPathing
 from finance_utils.process.prices.gbm import RVDecoupledGBM, GBM
-
+from finance_utils.trader.utility import UtilityFunction, LogUtilityFunction, PowerUtilityFunction
 # 外部模块
 import numpy
 
@@ -33,6 +33,8 @@ import numpy
 class MonteCarloResult:
     """压力测试结果"""
 
+    slice_tuple = namedtuple("slice_tuple", ["strategy", "spot"])
+
     def __init__(self, yield_slice_list: list, price_slice_list: list):
         self.yield_slices = numpy.array(yield_slice_list)
         self.spot_slices = numpy.array(price_slice_list)
@@ -41,8 +43,7 @@ class MonteCarloResult:
 
     def max_drawdown(self):
         """回撤"""
-        drawdown_tuple = namedtuple("drawdown_tuple", ["yield_drawdown", "spot_drawdown"])
-        return drawdown_tuple(numpy.min(self.yield_slices, axis=0), numpy.min(self.spot_slices, axis=0))
+        return self.slice_tuple(numpy.min(self.yield_slices, axis=0), numpy.min(self.spot_slices, axis=0))
 
     def mean_sharp(self, risk_free_rate: float = 1.03):
         """平均收益率夏普比率"""
@@ -50,9 +51,7 @@ class MonteCarloResult:
         def f(xlist):
             return (numpy.mean(xlist, axis=0) - risk_free_rate) / numpy.std(xlist, ddof=1, axis=0)
 
-        sharp_tuple = namedtuple("sharp_tuple", ["yield_sharp", "spot_sharp"])
-
-        return sharp_tuple(f(self.yield_slices), f(self.spot_slices))
+        return self.slice_tuple(f(self.yield_slices), f(self.spot_slices))
 
     def slice_sharp(self, risk_free_rate: float = 1.03, slice_index: int = -1):
         """切片收益率夏普比率"""
@@ -60,13 +59,33 @@ class MonteCarloResult:
         def f(xlist):
             return (xlist[slice_index] - risk_free_rate) / numpy.std(xlist, ddof=1, axis=0)
 
-        sharp_tuple = namedtuple("sharp_tuple", ["yield_sharp", "spot_sharp"])
+        return self.slice_tuple(f(self.yield_slices), f(self.spot_slices))
 
-        return sharp_tuple(f(self.yield_slices), f(self.spot_slices))
-
-    def slice_quantile_rate(self, risk_free_rate: float = 1.03, slice_index: int = -1):
+    def slice_utility_ratio(
+            self,
+            q1: float,
+            q2: float,
+            risk_free_rate: float = 1.03,
+            slice_index: int = -1,
+            positive_utility_function: UtilityFunction = LogUtilityFunction(),
+            negative_utility_function: UtilityFunction = PowerUtilityFunction(),
+            *args, **kwargs
+    ):
         """切片分位数比例"""
-        pass
+
+        def f(x1, x2):
+            x1 = positive_utility_function(1 + x1 - risk_free_rate, *args, **kwargs) if x1 >= risk_free_rate else 1
+            x2 = negative_utility_function(1 + x2 - risk_free_rate, *args, **kwargs) if x2 < risk_free_rate else 1
+            return x1 / x2
+
+        ydata = self.yield_slices[slice_index]
+        sdata = self.spot_slices[slice_index]
+        y1 = numpy.quantile(ydata, q1)
+        y2 = numpy.quantile(ydata, q2)
+        s1 = numpy.quantile(sdata, q1)
+        s2 = numpy.quantile(sdata, q2)
+
+        return self.slice_tuple(f(y1, y2), f(s1, s2))
 
 
 class SpotCostAveragingPlan:
