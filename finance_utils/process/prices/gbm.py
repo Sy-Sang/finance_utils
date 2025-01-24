@@ -55,7 +55,7 @@ class RVDecoupledGBM(PriceProcess):
                 self.price[-1] * (1 + r)
             )
         self.yield_rate_list = copy.deepcopy(rv)
-        self.times_series = TimeSeries(timestamp=self.timeline, price=self.price)
+        self.timeseries = TimeSeries(timestamp=self.timeline, price=self.price)
         self.constructor = {
             "name": name,
             "rv": self.yield_rate_list,
@@ -66,12 +66,12 @@ class RVDecoupledGBM(PriceProcess):
         }
 
     def __repr__(self):
-        return str(self.times_series)
+        return str(self.timeseries)
 
     def get_price(self, timestamp: TimeStr):
         ts = TimeStamp(timestamp)
         if ts >= self.timeline[0]:
-            raw_index = numpy.searchsorted(self.times_series.data["timestamp"], ts.timestamp())
+            raw_index = numpy.searchsorted(self.timeseries.data["timestamp"], ts.timestamp())
             index = raw_index - 1 if raw_index > 0 else 0
             value = self.price[index]
             return PricePathValue(

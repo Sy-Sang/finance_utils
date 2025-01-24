@@ -69,5 +69,16 @@ class PowerUtilityFunction(UtilityFunction, ):
             return x ** self.exp
 
 
+class TimeLossUtilityFunction(UtilityFunction):
+    """损失时间效用函数"""
+
+    def __init__(self, risk_free_rate: float = 1.03):
+        self.risk_free_rate = risk_free_rate
+
+    def __call__(self, x: float, *args, **kwargs):
+        return -1 * numpy.log(self.risk_free_rate / x) / numpy.log(self.risk_free_rate)
+
+
 if __name__ == "__main__":
-    pass
+    u = TimeLossUtilityFunction(1.03)
+    print([u(i) for i in numpy.arange(0.1, 2, 0.1)])
