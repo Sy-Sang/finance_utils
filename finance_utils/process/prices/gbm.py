@@ -68,7 +68,15 @@ class RVDecoupledGBM(PriceProcess):
     def __repr__(self):
         return str(self.timeseries)
 
-    def get_price(self, timestamp: TimeStr):
+    def __getitem__(self, item: int):
+        value = self.price[item]
+        return PricePathValue(
+            self.timeline[item],
+            value,
+            {self.name: {"price": value}}
+        )
+
+    def get_price(self, timestamp: TimeStr, *args, **kwargs):
         ts = TimeStamp(timestamp)
         if ts >= self.timeline[0]:
             raw_index = numpy.searchsorted(self.timeseries.data["timestamp"], ts.timestamp())

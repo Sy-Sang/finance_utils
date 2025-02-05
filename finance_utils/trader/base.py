@@ -120,7 +120,12 @@ class TradeBook(ABC):
 class Trader:
     """交易员"""
 
-    def __init__(self, name: str, investment: float, initial_timestamp: TimeStr):
+    def __init__(self, name: str, investment: float, initial_timestamp: TimeStr = None):
+        if initial_timestamp is None:
+            initial_timestamp = TimeStamp.now().accurate_to("year")
+        else:
+            pass
+
         self.name = name
         self.investment_flow: list[InvestmentRec] = [InvestmentRec(TimeStamp(initial_timestamp), investment)]
         self.capital = investment

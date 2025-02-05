@@ -15,9 +15,10 @@ __copyright__ = ""
 import copy
 import pickle
 import json
-from typing import Union, Self, List
+from typing import Union, Self, List, Tuple
 from collections import namedtuple
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 
 # 项目模块
 from finance_utils.uniontypes import *
@@ -32,18 +33,23 @@ import numpy
 # 代码块
 
 
-class PriceProcess:
+class PriceProcess(ABC):
     """价格过程"""
 
     def __init__(self, s0, *args, **kwargs):
         self.s0 = s0
+        self.timeline: list[TimeStamp] = []
 
     @abstractmethod
     def __repr__(self):
         pass
 
     @abstractmethod
-    def get_price(self, *args, **kwargs) -> PricePathValue:
+    def __getitem__(self, item) -> PricePathValue:
+        pass
+
+    @abstractmethod
+    def get_price(self, timestamp: TimeStr, *args, **kwargs) -> PricePathValue:
         """获取价格"""
         pass
 
@@ -56,6 +62,12 @@ class PriceProcess:
     def sharp(cls, yield_list, risk_free_rate: float):
         """夏普比率"""
         return (yield_list[-1] - risk_free_rate) / numpy.std(yield_list, ddof=1)
+
+    def process_iter(self):
+        """过程迭代器"""
+        for i, t in enumerate(self.timeline):
+            path_data = self[i]
+            yield i, t, path_data
 
 
 class MultiPathing:
