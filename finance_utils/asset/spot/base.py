@@ -19,6 +19,7 @@ from typing import Union, Self, TypeAlias
 from collections import namedtuple
 from enum import Enum
 import warnings
+import math
 
 # 项目模块
 from finance_utils.uniontypes import *
@@ -354,6 +355,63 @@ class Spot(Asset):
         quantity = trader.position[self.name].in_position_quantity(timestamp) * quantity_percentage
         quantity = quantity // 1 if must_int is True else quantity
         self.sold_to(trader, price, quantity, timestamp, *args, **kwargs)
+
+
+class ServiceChargesSpot(Spot):
+    """考虑卖出交易成本的现货"""
+
+    def __init__(
+            self,
+            name,
+            lot_size: Rational = None,
+            trade_delta: TradeDelta = TradeDelta("day", 0),
+            service_fee: float = 5e-4,
+            tax: float = 5e-4
+    ):
+        super().__init__(name, lot_size, trade_delta)
+        self.service_fee = service_fee
+        self.tax = tax
+        self.constructor = {
+            "name": self.name,
+            "lot_size": self.lot_size,
+            "trade_delta": self.trade_delta,
+            "service_fee": self.service_fee,
+            "tax": self.tax
+        }
+
+    def max_purchase_quantity(self, price, capital, *args, **kwargs):
+        q = super().max_purchase_quantity(price, capital)
+        effective_price = price * (1 + self.service_fee)
+        if q * effective_price <= capital:
+            return q
+        reduction_steps = math.ceil((q * effective_price - capital) / (self.lot_size * effective_price))
+        return q - reduction_steps * self.lot_size
+
+    def purchased_to(self, trader: Trader, price: float, capital: Union[Rational, None], timestamp: TimeStr,
+                     *args, **kwargs):
+        available_capital = trader.capital if capital is None else min(trader.capital, capital)
+        available_quantity = self.max_purchase_quantity(price, available_capital)
+        if available_quantity > 0:
+            trader.capital -= price * available_quantity
+            trader.capital -= price * available_quantity * self.service_fee
+            if self.name in trader.position:
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
+            else:
+                trader.position[self.name] = SpotTradeBook(self)
+                trader.position[self.name].append(timestamp, price, available_quantity, PositionType.long)
+            return available_quantity
+        else:
+            return 0
+
+    def sold_to(self, trader: Trader, price: Rational, quantity: Union[Rational, None],
+                timestamp: TimeStr, *args, **kwargs):
+        q = super().sold_to(trader, price, quantity, timestamp, *args, **kwargs)
+        if q > 0:
+            trader.capital -= q * price * self.service_fee
+            trader.capital -= q * price * self.tax
+        else:
+            pass
+        return q
 
 
 if __name__ == "__main__":
