@@ -106,6 +106,17 @@ class MultiPathing:
         for j in range(self.width):
             self.trades[j].clear()
 
+    def process_iter(self):
+        for i, t in enumerate(self.timeline):
+            dic = {}
+            paths = []
+            for j in range(self.width):
+                path = self.processes[j][i]
+                paths.append(path)
+                root = list(path.dic)[0]
+                dic[root] = path.dic[root]
+            yield i, t, paths
+
 
 if __name__ == "__main__":
     pass
