@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""对象类型"""
+"""模型层模块的__init__.py文件"""
 
 __author__ = "Sy,Sang"
 __version__ = ""
@@ -11,21 +11,4 @@ __status__ = "Development"
 __credits__ = []
 __date__ = ""
 __copyright__ = ""
-
-# 系统模块
-import copy
-import pickle
-import json
-from typing import Union, Self
-from collections import namedtuple
-
-# 项目模块
-
-# 外部模块
-import numpy
-
-# 代码块
-
-
-if __name__ == "__main__":
-    pass
+__all__ = []
