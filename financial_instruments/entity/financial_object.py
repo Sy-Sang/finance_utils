@@ -35,8 +35,8 @@ class Leg(ABC):
         self.id = str(uuid.uuid4())
 
     @abstractmethod
-    def forward(self, **kwargs):
-        "在当前 context 下“当期发生的原子事件”"
+    def reaction(self, **kwargs):
+        """在当前 context 下“当期发生的对市场反应的原子事件”"""
         pass
 
 
@@ -50,10 +50,13 @@ class FinancialObject(ABC):
 
     @abstractmethod
     def assemble(self, *args, **kwargs) -> Iterable[Leg]:
+        """根据参数组装指定的leg"""
         pass
 
 
 class FinancialInstance:
+    """金融实体"""
+
     def __init__(self, elements=None, financial_object: FinancialObject = None, *args, **kwargs):
         self.legs: list[Leg] = []
 
@@ -93,10 +96,11 @@ class FinancialInstance:
     def cat(cls, *args):
         return FinancialInstance(elements=args)
 
-    def forward(self, **kwargs):
+    def reaction(self, **kwargs):
+        """金融实体对市场的反应"""
         forward_result_set = []
         for i, leg in enumerate(self.legs):
-            forward_result_set.append(leg.forward(**kwargs))
+            forward_result_set.append(leg.reaction(**kwargs))
         return forward_result_set
 
 

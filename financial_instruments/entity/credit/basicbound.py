@@ -55,7 +55,7 @@ class BasicBondLeg(Leg):
             f"maturity={self.maturity_date})"
         )
 
-    def forward(self, **kwargs):
+    def reaction(self, **kwargs):
         if 'market_date' in kwargs:
             if TimeStamp(kwargs['market_date']) == self.maturity_date:
                 return self.face_amount
@@ -88,5 +88,5 @@ if __name__ == "__main__":
     bound2 = FinancialInstance(None, BasicBondObject(), "bound", MoneyLeg("CNY", 100), MoneyLeg("CNY", 50),
                                '2025-12-31')
     bound = FinancialInstance([mymoney, bound1, bound2])
-    print(bound.forward(market_date='2025-12-31'))
+    print(bound.reaction(market_date='2025-12-31'))
     # print(bound.interest_rate('2025-1-1', 7))

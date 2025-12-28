@@ -87,7 +87,7 @@ class MoneyLeg(Leg):
     def exchange(self, target_code, exchange_rate):
         return MoneyLeg(target_code, self.amount * exchange_rate)
 
-    def forward(self, **kwargs):
+    def reaction(self, **kwargs):
         return None
 
 
