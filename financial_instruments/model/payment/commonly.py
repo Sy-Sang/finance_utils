@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""amateur trader class"""
+"""commonly payment"""
 
 __author__ = "Sy,Sang"
 __version__ = ""
@@ -30,16 +30,23 @@ import numpy
 
 # 代码块
 
-class TheMostAmateurTrader(FinancialModule):
-    def __init__(self, init_amount: float, amount_symbol="CNY"):
-        super().__init__()
-        self.cash = BasicCash(amount_symbol, init_amount)
-        self.position = FinancialModule("position")
+class CashPay(FinancialModule):
+    """立即产生负现金流"""
 
-    def buy(self, *args, **kwargs):
-        return TradeRequest('buy', *args, **kwargs)
+    def __init__(self, sym, amount):
+        super().__init__(None)
+        self.sym = sym
+        self.amount = amount
+
+    def reaction(self, *args, **kwargs) -> Union["ReactionEvent", None]:
+        return ReactionEvent(
+            None,
+            "payment",
+            False,
+            None,
+            -BasicCash(self.sym, self.amount)
+        )
 
 
 if __name__ == "__main__":
-    trader = TheMostAmateurTrader(10000)
-    print(trader)
+    pass

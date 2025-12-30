@@ -21,7 +21,7 @@ from typing import *
 from collections import namedtuple
 
 # 项目模块
-from financial_instruments.model.fm import FinancialModule, ReactionEvent
+from financial_instruments.mop.fm import *
 
 # 外部模块
 import numpy
@@ -32,7 +32,7 @@ import numpy
 
 class BasicCash(FinancialModule):
     def __init__(self, symbol, amount):
-        super().__init__("cash")
+        super().__init__()
         self.symbol = symbol
         self.amount = float(amount)
 
@@ -105,4 +105,3 @@ if __name__ == "__main__":
 
     print((cny + 100).exchange('USD', 1 / 7))
     print((cny + 100) * 2)
-    print((cny + 100).collect_trade())

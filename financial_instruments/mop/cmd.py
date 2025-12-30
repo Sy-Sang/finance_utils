@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""amateur trader class"""
+"""reaction cmd 编译器"""
 
 __author__ = "Sy,Sang"
 __version__ = ""
@@ -22,7 +22,6 @@ from collections import namedtuple
 
 # 项目模块
 from financial_instruments.mop.fm import *
-from financial_instruments.model.currency.cash import BasicCash
 
 # 外部模块
 import numpy
@@ -30,16 +29,21 @@ import numpy
 
 # 代码块
 
-class TheMostAmateurTrader(FinancialModule):
-    def __init__(self, init_amount: float, amount_symbol="CNY"):
-        super().__init__()
-        self.cash = BasicCash(amount_symbol, init_amount)
-        self.position = FinancialModule("position")
+class CommandCompiler:
+    def __init__(self, cmd:str):
+        self.cmd = cmd
 
-    def buy(self, *args, **kwargs):
-        return TradeRequest('buy', *args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        pass
+
+class DeleteSubModule(CommandCompiler):
+    def __init__(self):
+        super().__init__("delete submodule")
+
+    def __call__(self, act: ReactionEvent, dic: Dict, *args, **kwargs):
+        pass
+
 
 
 if __name__ == "__main__":
-    trader = TheMostAmateurTrader(10000)
-    print(trader)
+    pass
