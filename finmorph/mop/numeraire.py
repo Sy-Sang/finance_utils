@@ -21,7 +21,7 @@ from typing import *
 from collections import namedtuple
 
 # 项目模块
-from finmorph.mop.finmodule import *
+from finmorph.mop.finmodule import FinancialModule, FinancialQuantity
 
 # 外部模块
 import numpy

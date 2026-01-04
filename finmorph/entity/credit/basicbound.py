@@ -53,9 +53,13 @@ class BasicBound(FinancialModule):
             f"maturity={self.maturity_date})}}"
         )
 
+    def _value(self, *args, **kwargs):
+        if TimeStamp(kwargs['date']) < self.maturity_date:
+            pass
+
 
 if __name__ == "__main__":
-    bound1 = BasicBound(Numeraire(100, "CNY"), Numeraire(90, "CNY"), 1, '2025-12-31')
-    bound2 = BasicBound(Numeraire(100, "CNY"), Numeraire(95, "CNY"), 1, '2025-8-31')
+    bound1 = BasicBound(Numeraire(100), Numeraire(90), 1, '2025-12-31')
+    bound2 = BasicBound(Numeraire(100), Numeraire(95), 1, '2025-8-31')
 
     print(bound1.value())
